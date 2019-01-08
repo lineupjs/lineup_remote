@@ -15,15 +15,24 @@ def to_dict(result):
   return [{c: r[c] for c in columns} for r in result]
 
 
+def get_desc():
+  return [
+    dict(label='D', type='string', column='d'),
+    dict(label='A', type='number', column='a', domain=[0, 1]),
+    dict(label='Cat', type='categorical', column='cat', categories=['c1', 'c2', 'c3']),
+    dict(label='Cat Label', type='categorical', column='cat2', categories=['a1', 'a2']),
+  ]
+
+
+def get_count():
+  r = db_session.execute('select count(*) as c from rows')
+  return to_dict(r)[0]['c']
+
+
 def get_rows(ids=None):
   if not ids:
     return to_dict(db_session.execute('select * from rows'))
   return to_dict(db_session.execute('select * from rows where id = any(:ids)', params=dict(ids=ids)))
-
-
-def get_row_count():
-  r = db_session.execute('select count(*) as c from rows')
-  return to_dict(r)[0]['c']
 
 
 def get_row(row_id):

@@ -30,10 +30,10 @@ paths:
                   $ref: '#/components/schemas/Row'
         '404':
           description: Row does not exist
-  /row/count:
+  /count:
     get:
       summary: get number of rows
-      operationId: api.get_row_count
+      operationId: api.get_count
       responses:
         '200':
           description: return number of rows
@@ -42,6 +42,22 @@ paths:
               schema:
                 type: integer
                 format: int32
+        '404':
+          description: Row does not exist
+  /desc:
+    get:
+      summary: get row desc
+      operationId: api.get_desc
+      responses:
+        '200':
+          description: return number of rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
         '404':
           description: Row does not exist
   /row/{row_id}:
