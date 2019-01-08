@@ -13,12 +13,12 @@ paths:
       parameters:
         - name: ids
           in: query
-          explode: false
+          # explode: false
           schema:
             type: array
             items:
-              - type: integer
-                format: int32
+              type: integer
+              format: int32
 
       responses:
         '200':
@@ -123,4 +123,4 @@ components:
         groups:
           type: array
           items:
-            - $ref: '#/components/schemas/OrderedGroup'
+            $ref: '#/components/schemas/OrderedGroup'

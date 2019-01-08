@@ -24,7 +24,9 @@ def get_row(row_id):
 
 
 def get_rows(ids=None):
-  return to_dict(db_session.execute('select * from rows'))
+  if not ids:
+    return to_dict(db_session.execute('select * from rows'))
+  return to_dict(db_session.execute('select * from rows where id = any(:ids)', params=dict(ids=ids)))
 
 
 def get_row_count():
