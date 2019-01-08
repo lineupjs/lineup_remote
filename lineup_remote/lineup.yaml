@@ -1,19 +1,19 @@
 openapi: 3.0.0
-servers:
-  - url: http://localhost:8080/
 info:
-  description: "LineUp Remote"
   version: "1.0.0"
-  title: "LineUp Remote"
-basePath: "/api"
+  title: LineUp Remote
+  description: LineUp Remote
+servers:
+  - url: /api
 paths:
   /row/:
     get:
-      summary: "get a bunch of rows"
-      operationId: "lineup_remote.api.get_rows"
+      summary: get a bunch of rows
+      operationId: api.get_rows
       parameters:
         - name: ids
           in: query
+          explode: false
           schema:
             type: array
             items:
@@ -31,10 +31,24 @@ paths:
                   $ref: '#/components/schemas/Row'
         '404':
           description: Row does not exist
+  /row/count:
+    get:
+      summary: get number of rows
+      operationId: api.get_row_count
+      responses:
+        '200':
+          description: Return number of rows
+          content:
+            application/json:
+              schema:
+                type: integer
+                format: int32
+        '404':
+          description: Row does not exist
   /row/{row_id}:
     get:
-      summary: "get a row by id"
-      operationId: "lineup_remote.api.get_row"
+      summary: get a row by id
+      operationId: api.get_row
       parameters:
         - $ref: '#/components/parameters/row_id'
       responses:
@@ -56,7 +70,6 @@ components:
       schema:
         type: integer
         format: int32
-definitions:
   schemas:
     Row:
       type: object
@@ -104,7 +117,7 @@ definitions:
         - maxDataIndex
         - groups
       properties:
-        maxDatIndex:
+        maxDataIndex:
           type: integer
           format: int32
         groups:

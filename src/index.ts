@@ -17,7 +17,7 @@ class Server implements IServerData {
   }
 
   view(indices: number[]): Promise<IRow[]> {
-    const url = new URL('/api/rows');
+    const url = new URL('/rows');
     url.searchParams.set('ids', indices.join(','));
     return fetch(url.href).then((r) => r.json());
   }

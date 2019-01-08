@@ -15,3 +15,12 @@ services:
       - 'POSTGRES_PASSWORD=lineup'
       - 'POSTGRES_USER=lineup'
       - 'POSTGRES_DB=lineup'
+  pgadmin:
+    image: dpage/pgadmin4
+    links:
+      - postgres
+    environment:
+      - 'PGADMIN_DEFAULT_EMAIL=lineup@lineup.js.org'
+      - 'PGADMIN_DEFAULT_PASSWORD=lineup'
+    ports:
+      - '8090:80'
