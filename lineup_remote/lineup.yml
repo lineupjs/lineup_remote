@@ -1,0 +1,51 @@
+openapi: 3.0.0
+servers:
+  - url: http://localhost:8080/
+info:
+  description: "LineUp Remote"
+  version: "1.0.0"
+  title: "LineUp Remote"
+basePath: "/api"
+paths:
+  /row/{row_id}:
+    get:
+      summary: "get a row by id"
+      operationId: "lineup_remote.api.get_row"
+      parameters:
+        - $ref: '#/components/parameters/row_id'
+      responses:
+        '200':
+          description: Return row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Row'
+        '404':
+          description: Row does not exist
+components:
+  parameters:
+    row_id:
+      name: row_id
+      description: Row's Unique identifier
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int32
+definitions:
+  schemas:
+    Row:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          description: Unique identifier
+          example: '123'
+          readOnly: true
+        d:
+          type: string
+        a:
+          type: float
+          

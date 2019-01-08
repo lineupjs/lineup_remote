@@ -11,3 +11,5 @@ node_modules/
 *.log
 /.cache-loader
 /tmp
+*.pyc
+*.egg-info/
