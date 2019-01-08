@@ -10,23 +10,28 @@ interface IRow {
 }
 
 class Server implements IServerData {
-  totalNumberOfRows = 100;
+  constructor(public readonly totalNumberOfRows: number) {
+
+  }
 
   sort(ranking: IServerRankingDump): Promise<{groups: IOrderedGroup[]; maxDataIndex: number;}> {
     throw new Error('Method not implemented.');
   }
 
   view(indices: number[]): Promise<IRow[]> {
-    const url = new URL('/rows');
+    const url = new URL('/api/row');
     url.searchParams.set('ids', indices.join(','));
     return fetch(url.href).then((r) => r.json());
   }
+
   mappingSample(column: IColumnDump): Promise<number[]> {
     throw new Error('Method not implemented.');
   }
+
   search(search: string | RegExp, column: IColumnDump): Promise<number[]> {
     throw new Error('Method not implemented.');
   }
+
   computeDataStats(columns: IColumnDump[]): Promise<IRemoteStatistics[]> {
     throw new Error('Method not implemented.');
   }
@@ -49,7 +54,7 @@ const desc = [{
     label: 'A',
     type: 'number',
     column: 'a',
-    'domain': [0, 10]
+    domain: [0, 10]
   },
   {
     label: 'Cat',
@@ -72,6 +77,9 @@ const desc = [{
     }]
   }
 ];
-const provider = new RemoteDataProvider(new Server(), desc, {});
 
-const lineup = new LineUp(document.body, provider, {});
+fetch('/api/row/count').then((r) => r.json()).then((count: number) => {
+  const provider = new RemoteDataProvider(new Server(count), desc, {});
+
+  const lineup = new LineUp(document.body, provider, {});
+});

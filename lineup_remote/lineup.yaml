@@ -19,10 +19,9 @@ paths:
             items:
               type: integer
               format: int32
-
       responses:
         '200':
-          description: Return rows
+          description: return rows
           content:
             application/json:
               schema:
@@ -37,7 +36,7 @@ paths:
       operationId: api.get_row_count
       responses:
         '200':
-          description: Return number of rows
+          description: return number of rows
           content:
             application/json:
               schema:
@@ -53,13 +52,229 @@ paths:
         - $ref: '#/components/parameters/row_id'
       responses:
         '200':
-          description: Return row
+          description: return row
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Row'
         '404':
           description: Row does not exist
+  /stats:
+    post:
+      summary: get column data stats
+      operationId: api.post_stats
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/RemoteColumnDump'
+      responses:
+        '200':
+          description: return stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RemoteStatistics'
+  /column/{column}/stats:
+    get:
+      summary: get column data stats
+      operationId: api.get_column_stats
+      parameters:
+        - $ref: '#/components/parameters/column'
+      responses:
+        '200':
+          description: return stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteStatistics'
+        '404':
+          description: Column not found
+    post:
+      summary: get column data stats
+      operationId: api.post_column_stats
+      parameters:
+        - $ref: '#/components/parameters/column'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoteColumnDump'
+      responses:
+        '200':
+          description: return stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteStatistics'
+        '404':
+          description: Column not found
+  /column/{column}/mappingSample:
+    get:
+      summary: get column data mapping sample
+      operationId: api.get_column_mapping_sample
+      parameters:
+        - $ref: '#/components/parameters/column'
+      responses:
+        '200':
+          description: return mapping samples
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: number
+                  format: float
+        '404':
+          description: Column not found
+  /column/{column}/search:
+    get:
+      summary: search within column
+      operationId: api.get_column_search
+      parameters:
+        - $ref: '#/components/parameters/column'
+        - $ref: '#/components/parameters/query'
+      responses:
+        '200':
+          description: return data indices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: integer
+                  format: int32
+        '404':
+          description: Column not found
+  /ranking/sort:
+    post:
+      summary: sort rows
+      operationId: api.post_sort
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServerRankingDump'
+      responses:
+        '200':
+          description: return sort
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SortResult'
+  /ranking/column/{column}/stats:
+    post:
+      summary: get column data stats for a ranking
+      operationId: api.post_ranking_column_stats
+      parameters:
+        - $ref: '#/components/parameters/column'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoteRankingColumnDump'
+      responses:
+        '200':
+          description: return stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteStatistics'
+        '404':
+          description: Column not found
+  /ranking/stats:
+    post:
+      summary: get column data stats for a ranking
+      operationId: api.post_ranking_stats
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ranking
+                - columns
+              properties:
+                ranking:
+                  $ref: '#/components/schemas/ServerRankingDump'
+                columns:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/RemoteColumnDump'
+      responses:
+        '200':
+          description: return stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RemoteStatistics'
+  /ranking/group/{group]/column/{column}/stats:
+    post:
+      summary: get column data stats for a ranking group
+      operationId: api.post_ranking_group_column_stats
+      parameters:
+        - $ref: '#/components/parameters/group'
+        - $ref: '#/components/parameters/column'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoteRankingColumnDump'
+      responses:
+        '200':
+          description: return stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteStatistics'
+        '404':
+          description: Column not found
+  /ranking/group/{group]/stats:
+    post:
+      summary: get column data stats for a ranking
+      operationId: api.post_ranking_group_stats
+      parameters:
+        - $ref: '#/components/parameters/group'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ranking
+                - group
+                - columns
+              properties:
+                ranking:
+                  $ref: '#/components/schemas/ServerRankingDump'
+                group:
+                  type: string
+                columns:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/RemoteColumnDump'
+      responses:
+        '200':
+          description: return stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RemoteStatistics'
 components:
   parameters:
     row_id:
@@ -70,6 +285,27 @@ components:
       schema:
         type: integer
         format: int32
+    column:
+      name: column
+      description: column name
+      in: path
+      required: true
+      schema:
+        type: string
+    group:
+      name: group
+      description: group name
+      in: path
+      required: true
+      schema:
+        type: string
+    query:
+      name: query
+      description: search query
+      in: query
+      required: true
+      schema:
+        type: string
   schemas:
     Row:
       type: object
@@ -124,3 +360,391 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderedGroup'
+    CategoricalStatistics:
+      type: object
+      required:
+        - missing
+        - count
+        - maxBin
+        - hist
+      properties:
+        missing:
+          type: integer
+          format: int32
+        count:
+          type: integer
+          format: int32
+        maxBin:
+          type: integer
+          format: int32
+        hist:
+          type: array
+          items:
+            type: object
+            required:
+              - cat
+              - count
+            properties:
+              cat:
+                type: string
+              count:
+                type: integer
+                format: int32
+    DateStatistics:
+      type: object
+      required:
+        - min
+        - max
+        - missing
+        - count
+        - maxBin
+        - histGranularity
+        - hist
+      properties:
+        min:
+          type: string
+          format: date-time
+        max:
+          type: string
+          format: date-time
+        missing:
+          type: integer
+          format: int32
+        count:
+          type: integer
+          format: int32
+        maxBin:
+          type: integer
+          format: int32
+        histGranularity:
+          type: string
+          enum:
+            - year
+            - month
+            - day
+        hist:
+          type: array
+          items:
+            type: object
+            required:
+              - x0
+              - x1
+              - count
+            properties:
+              x0:
+                type: string
+                format: date-time
+              x1:
+                type: string
+                format: date-time
+              count:
+                type: integer
+                format: int32
+    Statistics:
+      type: object
+      required:
+        - mean
+        - min
+        - max
+        - missing
+        - count
+        - maxBin
+        - hist
+      properties:
+        mean:
+          type: number
+          format: float
+        min:
+          type: number
+          format: float
+        max:
+          type: number
+          format: float
+        missing:
+          type: integer
+          format: int32
+        count:
+          type: integer
+          format: int32
+        maxBin:
+          type: integer
+          format: int32
+        hist:
+          type: array
+          items:
+            type: object
+            required:
+              - x0
+              - x1
+              - count
+            properties:
+              x0:
+                type: number
+                format: float
+              x1:
+                type: number
+                format: float
+              count:
+                type: integer
+                format: int32
+    AdvancedBoxPlotData:
+      type: object
+      required:
+        - min
+        - max
+        - median
+        - q1
+        - q3
+        - outlier
+        - whiskerLow
+        - whiskerHigh
+        - mean
+        - missing
+        - count
+      properties:
+        min:
+          type: number
+          format: float
+        max:
+          type: number
+          format: float
+        median:
+          type: number
+          format: float
+        q1:
+          type: number
+          format: float
+        q3:
+          type: number
+          format: float
+        outlier:
+          type: array
+          items:
+            type: number
+            format: float
+        whiskerLow:
+          type: number
+          format: float
+        whiskerHigh:
+          type: number
+          format: float
+        mean:
+          type: number
+          format: float
+        missing:
+          type: integer
+          format: int32
+        count:
+          type: integer
+          format: int32
+    MultiNumberStatistics:
+      type: object
+      required:
+        - raw
+        - rawBoxPlot
+        - normalized
+        - normalizedBoxPlot
+      properties:
+        raw:
+          $ref: '#/components/schemas/Statistics'
+        rawBoxPlot:
+          $ref: '#/components/schemas/AdvancedBoxPlotData'
+        normalized:
+          $ref: '#/components/schemas/Statistics'
+        normalizedBoxPlot:
+          $ref: '#/components/schemas/AdvancedBoxPlotData'
+    RemoteStatistics:
+      oneOf:
+        - $ref: '#/components/schemas/DateStatistics'
+        - $ref: '#/components/schemas/CategoricalStatistics'
+        - $ref: '#/components/schemas/MultiNumberStatistics'
+    ColumnDump:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+    NumberFilter:
+      type: object
+      required:
+        - min
+        - max
+        - filterMissing
+      properties:
+        min:
+          type: number
+          format: float
+        max:
+          type: number
+          format: float
+        filterMissing:
+          type: boolean
+    MappingFunction:
+      type: object
+      required:
+        - type
+        - domain
+        - range
+      properties:
+        type:
+          type: string
+          enum:
+            - log
+            - sqrt
+            - pow
+            - linear
+        domain:
+          type: array
+          items:
+            type: number
+            format: float
+          minLength: 2
+        range:
+          type: array
+          items:
+            type: number
+            format: float
+          minLength: 2
+    NumberColumnDump:
+      allOf:
+        - $ref: '#/components/schemas/ColumnDump'
+        - type: object
+          required:
+            - groupSortMethod
+            - map
+          properties:
+            map:
+              $ref: '#/components/schemas/MappingFunction'
+            filter:
+              $ref: '#/components/schemas/NumberFilter'
+            groupSortMethod:
+              type: string
+              enum:
+                - min
+                - max
+                - mean
+                - median
+                - q1
+                - q3
+            stratifyThreshholds:
+              type: array
+              items:
+                type: number
+                format: float
+    CategoricalFilter:
+      type: object
+      required:
+        - filter
+        - filterMissing
+      properties:
+        filter:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          type: number
+          format: float
+        filterMissing:
+          type: boolean
+    CategoricalColumnDump:
+      allOf:
+        - $ref: '#/components/schemas/ColumnDump'
+        - type: object
+          properties:
+            filter:
+              $ref: '#/components/schemas/CategoricalFilter'
+    DateColumnDump:
+      allOf:
+        - $ref: '#/components/schemas/ColumnDump'
+        - type: object
+          properties:
+            filter:
+              $ref: '#/components/schemas/NumberFilter'
+            grouper:
+              type: object
+              required:
+                - granularity
+                - circular
+              properties:
+                granularity:
+                  type: string
+                  enum:
+                    - century
+                    - decade
+                    - year
+                    - month
+                    - week
+                    - day_of_week
+                    - day_of_month
+                    - day_of_year
+                    - hour
+                    - minute
+                    - second
+                circular:
+                  type: boolean
+    StringColumnDump:
+      allOf:
+        - $ref: '#/components/schemas/ColumnDump'
+        - type: object
+          properties:
+            filter:
+              type: string
+            groupCriteria:
+              type: array
+              items:
+                type: string
+    RemoteColumnDump:
+      oneOf:
+        - $ref: '#/components/schemas/CategoricalColumnDump'
+        - $ref: '#/components/schemas/DateColumnDump'
+        - $ref: '#/components/schemas/NumberColumnDump'
+        - $ref: '#/components/schemas/StringColumnDump'
+    ServerRankingDump:
+      type: object
+      required:
+        - filter
+        - sortCriteria
+        - groupCriteria
+        - groupSortCriteria
+      properties:
+        filter:
+          type: array
+          items:
+            $ref: '#/components/schemas/RemoteColumnDump'
+        sortCriteria:
+          type: object
+          required:
+            - asc
+            - col
+          properties:
+            asc:
+              type: boolean
+            col:
+              $ref: '#/components/schemas/RemoteColumnDump'
+        groupCriteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/RemoteColumnDump'
+        groupSortCriteria:
+          type: object
+          required:
+            - asc
+            - col
+          properties:
+            asc:
+              type: boolean
+            col:
+              $ref: '#/components/schemas/RemoteColumnDump'
+    RemoteRankingColumnDump:
+      type: object
+      required:
+        - column
+        - ranking
+      properties:
+        column:
+          $ref: '#/components/schemas/RemoteColumnDump'
+        ranking:
+          $ref: '#/components/schemas/ServerRankingDump'
+

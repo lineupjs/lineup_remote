@@ -1,5 +1,5 @@
 import logging
-import connexion
+from connexion import FlaskApp, NoContent
 
 db_session = None
 
@@ -15,14 +15,6 @@ def to_dict(result):
   return [{c: r[c] for c in columns} for r in result]
 
 
-def get_row(row_id):
-  r = db_session.execute('select * from rows where id = :row_id', params=dict(row_id=row_id))
-  r = to_dict(r)
-  if not r:
-    return connexion.NoContent, 404
-  return r[0]
-
-
 def get_rows(ids=None):
   if not ids:
     return to_dict(db_session.execute('select * from rows'))
@@ -34,10 +26,57 @@ def get_row_count():
   return to_dict(r)[0]['c']
 
 
+def get_row(row_id):
+  r = db_session.execute('select * from rows where id = :row_id', params=dict(row_id=row_id))
+  r = to_dict(r)
+  if not r:
+    return NoContent, 404
+  return r[0]
+
+
+def post_stats(body):
+  return None
+
+
+def post_stats(body):
+  return None
+
+
+def get_column_stats(column):
+  return None
+
+
+def get_column_mapping_sample(column):
+  return None
+
+
+def get_column_search(column):
+  return None
+
+
+def post_column_stats(column, body):
+  return None
+
+
+def post_ranking_column_stats(column, body):
+  return None
+
+
+def post_ranking_stats(body):
+  return None
+
+
+def post_ranking_group_stats(group, body):
+  return None
+
+
+def post_ranking_group_column_stats(group, column, body):
+  return None
+
 
 logging.basicConfig(level=logging.INFO)
 db_session = _init_db('postgresql://lineup:lineup@postgres/lineup')
-app = connexion.FlaskApp(__name__)
+app = FlaskApp(__name__)
 app.add_api('lineup.yaml')
 
 
