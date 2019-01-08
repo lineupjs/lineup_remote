@@ -7,6 +7,30 @@ info:
   title: "LineUp Remote"
 basePath: "/api"
 paths:
+  /row/:
+    get:
+      summary: "get a bunch of rows"
+      operationId: "lineup_remote.api.get_rows"
+      parameters:
+        - name: ids
+          in: query
+          schema:
+            type: array
+            items:
+              - type: integer
+                format: int32
+
+      responses:
+        '200':
+          description: Return rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Row'
+        '404':
+          description: Row does not exist
   /row/{row_id}:
     get:
       summary: "get a row by id"
@@ -47,5 +71,43 @@ definitions:
         d:
           type: string
         a:
-          type: float
-          
+          type: number
+          format: float
+        cat:
+          type: string
+          enum:
+            - c1
+            - c2
+            - c3
+        cat2:
+          type: string
+          enum:
+            - a1
+            - a2
+    OrderedGroup:
+      type: object
+      required:
+        - name
+        - color
+        - order
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+        order:
+          type: string
+          format: byte
+    SortResult:
+      type: object
+      required:
+        - maxDataIndex
+        - groups
+      properties:
+        maxDatIndex:
+          type: integer
+          format: int32
+        groups:
+          type: array
+          items:
+            - $ref: '#/components/schemas/OrderedGroup'

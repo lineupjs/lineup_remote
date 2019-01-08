@@ -1,18 +1,40 @@
 import 'file-loader?name=index.html!extract-loader!html-loader?interpolate!./index.html';
 import './style.scss';
-import {LineUp, RemoteDataProvider, IServerData} from 'lineupjs';
+import {LineUp, RemoteDataProvider, IServerData, IOrderedGroup, IRemoteStatistics, IColumnDump, IServerRankingDump} from 'lineupjs';
+
+interface IRow {
+  d: string;
+  a: number;
+  cat: string;
+  cat2: string;
+}
 
 class Server implements IServerData {
-  view(indices: number[]): Promise<any[]> {
-    throw new Error("Method not implemented.");
+  totalNumberOfRows = 100;
+
+  sort(ranking: IServerRankingDump): Promise<{groups: IOrderedGroup[]; maxDataIndex: number;}> {
+    throw new Error('Method not implemented.');
   }
 
-  mappingSample(column: any): Promise<number[]> {
-    throw new Error("Method not implemented.");
+  view(indices: number[]): Promise<IRow[]> {
+    const url = new URL('/api/rows');
+    url.searchParams.set('ids', indices.join(','));
+    return fetch(url.href).then((r) => r.json());
   }
-
-  search(search: string | RegExp, column: any): Promise<number[]> {
-    throw new Error("Method not implemented.");
+  mappingSample(column: IColumnDump): Promise<number[]> {
+    throw new Error('Method not implemented.');
+  }
+  search(search: string | RegExp, column: IColumnDump): Promise<number[]> {
+    throw new Error('Method not implemented.');
+  }
+  computeDataStats(columns: IColumnDump[]): Promise<IRemoteStatistics[]> {
+    throw new Error('Method not implemented.');
+  }
+  computeRankingStats(ranking: IServerRankingDump, columns: IColumnDump[]): Promise<IRemoteStatistics[]> {
+    throw new Error('Method not implemented.');
+  }
+  computeGroupStats(ranking: IServerRankingDump, group: string, columns: IColumnDump[]): Promise<IRemoteStatistics[]> {
+    throw new Error('Method not implemented.');
   }
 
 
