@@ -14,8 +14,19 @@ class Server implements IServerData {
 
   }
 
+  private post(url: string, body: object) {
+    return fetch(url, {
+      method: 'POST',
+      body: JSON.stringify(body, null, 2),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }).then((r) => r.json());
+  }
+
   sort(ranking: IServerRankingDump): Promise<{groups: IOrderedGroup[]; maxDataIndex: number;}> {
-    throw new Error('Method not implemented.');
+    // fix indices to typed array
+    return this.post(`/api/sort`, ranking);
   }
 
   view(indices: number[]): Promise<IRow[]> {
@@ -25,24 +36,26 @@ class Server implements IServerData {
   }
 
   mappingSample(column: IColumnDump): Promise<number[]> {
-    throw new Error('Method not implemented.');
+    return this.post(`/api/column/${column.id}/mappingSample`, column);
   }
 
   search(search: string | RegExp, column: IColumnDump): Promise<number[]> {
-    throw new Error('Method not implemented.');
+    const url = new URL(`/api/column/${column.id}`);
+    url.searchParams.set('query', search.toString());
+    return fetch(url.href).then((r) => r.json());
   }
 
   computeDataStats(columns: IColumnDump[]): Promise<IRemoteStatistics[]> {
-    throw new Error('Method not implemented.');
+    return this.post(`/api/stats`, columns);
   }
+
   computeRankingStats(ranking: IServerRankingDump, columns: IColumnDump[]): Promise<IRemoteStatistics[]> {
-    throw new Error('Method not implemented.');
+    return this.post(`/api/ranking/stats`, {ranking, columns});
   }
+
   computeGroupStats(ranking: IServerRankingDump, group: string, columns: IColumnDump[]): Promise<IRemoteStatistics[]> {
-    throw new Error('Method not implemented.');
+    return this.post(`/api/ranking/group/${group}/stats`, {ranking, columns});
   }
-
-
 }
 
 const desc = [{
