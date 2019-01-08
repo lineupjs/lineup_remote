@@ -22,7 +22,7 @@ def get_rows(ids=None):
 logging.basicConfig(level=logging.INFO)
 db_session = _init_db('sqlite:///:memory:')
 app = connexion.FlaskApp(__name__)
-app.add_api('openapi.yaml')
+app.add_api('lineup.yaml')
 
 
 
