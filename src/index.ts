@@ -64,7 +64,7 @@ Promise.all([
   fetch('/api/count').then((r) => r.json())
 ]).then(([desc, count]: [any[], number]) => {
   const provider = new RemoteDataProvider(new Server(count), desc, {});
-  provider.ensureOneRanking();
+  provider.deriveDefault();
 
   return new LineUp(document.body, provider, {});
 });

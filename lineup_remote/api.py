@@ -1,5 +1,6 @@
 import logging
 from connexion import FlaskApp, NoContent
+from model import parse_column_dump, parse_ranking_dump
 
 db_session = None
 
@@ -13,10 +14,6 @@ def _init_db(uri):
 def to_dict(result):
   columns = result.keys()
   return [{c: r[c] for c in columns} for r in result]
-
-
-def to_filter(column_dump):
-  pass
 
 
 def get_desc():
@@ -48,11 +45,24 @@ def get_row(row_id):
 
 
 def post_sort(body):
-  return []
+  ranking_dump = parse_ranking_dump(body)
+
+  r = db_session.execute('select id from rows')
+  ids = [row['id'] for row in r]
+  return {
+    'groups': [
+      {
+        'name': 'default group',
+        'color': 'gray',
+        'order': ids
+      }
+    ],
+    'maxDataIndex': ids[-1]
+  }
 
 
 def post_stats(body):
-  column_dumps = body
+  column_dumps = [parse_column_dump(r) for r in body]
   return []
 
 
@@ -71,31 +81,31 @@ def get_column_search(column, query):
 
 
 def post_column_stats(column, body):
-  column_dump = body
+  column_dump = parse_column_dump(body)
   return None
 
 
 def post_ranking_column_stats(column, body):
-  ranking_dump = body['ranking']
-  column_dump = body['column']
+  ranking_dump = parse_ranking_dump(body['ranking'])
+  column_dump = parse_column_dump(body['column'])
   return None
 
 
 def post_ranking_stats(body):
-  ranking_dump = body['ranking']
-  column_dumps = body['columns']
+  ranking_dump = parse_ranking_dump(body['ranking'])
+  column_dumps = [parse_column_dump(r) for r in body['columns']]
   return []
 
 
 def post_ranking_group_stats(group, body):
-  ranking_dump = body['ranking']
-  column_dumps = body['columns']
+  ranking_dump = parse_ranking_dump(body['ranking'])
+  column_dumps = [parse_column_dump(r) for r in body['columns']]
   return []
 
 
 def post_ranking_group_column_stats(group, column, body):
-  ranking_dump = body['ranking']
-  column_dump = body['column']
+  ranking_dump = parse_ranking_dump(body['ranking'])
+  column_dump = parse_column_dump(body['column'])
   return None
 
 

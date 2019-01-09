@@ -215,17 +215,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - ranking
-                - columns
-              properties:
-                ranking:
-                  $ref: '#/components/schemas/ServerRankingDump'
-                columns:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/RemoteColumnDump'
+              $ref: '#/components/schemas/RemoteRankingColumnsDump'
       responses:
         '200':
           description: return stats
@@ -268,20 +258,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - ranking
-                - group
-                - columns
-              properties:
-                ranking:
-                  $ref: '#/components/schemas/ServerRankingDump'
-                group:
-                  type: string
-                columns:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/RemoteColumnDump'
+              $ref: '#/components/schemas/RemoteRankingColumnsDump'
       responses:
         '200':
           description: return stats
@@ -578,9 +555,19 @@ components:
       type: object
       required:
         - id
+        - desc
       properties:
         id:
           type: string
+        desc:
+          oneOf:
+            - type: string
+            - type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
     NumberFilter:
       type: object
       required:
@@ -660,8 +647,6 @@ components:
             - type: array
               items:
                 type: string
-          type: number
-          format: float
         filterMissing:
           type: boolean
     CategoricalColumnDump:
@@ -717,6 +702,8 @@ components:
         - $ref: '#/components/schemas/DateColumnDump'
         - $ref: '#/components/schemas/NumberColumnDump'
         - $ref: '#/components/schemas/StringColumnDump'
+        - type: object
+          additionalProperties: true
     ServerRankingDump:
       type: object
       required:
@@ -760,11 +747,23 @@ components:
     RemoteRankingColumnDump:
       type: object
       required:
-        - column
         - ranking
+        - column
       properties:
-        column:
-          $ref: '#/components/schemas/RemoteColumnDump'
         ranking:
           $ref: '#/components/schemas/ServerRankingDump'
+        column:
+          $ref: '#/components/schemas/RemoteColumnDump'
+    RemoteRankingColumnsDump:
+      type: object
+      required:
+        - ranking
+        - columns
+      properties:
+        ranking:
+          $ref: '#/components/schemas/ServerRankingDump'
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/RemoteColumnDump'
 
