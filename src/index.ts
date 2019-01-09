@@ -30,9 +30,10 @@ class Server implements IServerData {
   }
 
   view(indices: number[]): Promise<IRow[]> {
-    const url = new URL('/api/row');
-    url.searchParams.set('ids', indices.join(','));
-    return fetch(url.href).then((r) => r.json());
+    if (indices.length === 1) {
+      return fetch(`/api/row/${encodeURIComponent(indices[0].toString())}`).then((r) => r.json()).then((r) => [r]);
+    }
+    return fetch(`/api/row/?ids=${encodeURIComponent(indices.join(','))}`).then((r) => r.json());
   }
 
   mappingSample(column: IColumnDump): Promise<number[]> {
@@ -42,7 +43,7 @@ class Server implements IServerData {
   search(search: string | RegExp, column: IColumnDump): Promise<number[]> {
     const url = new URL(`/api/column/${column.id}`);
     url.searchParams.set('query', search.toString());
-    return fetch(url.href).then((r) => r.json());
+    return fetch(`/api/column/${column.id}/?query=${encodeURIComponent(search.toString())}`).then((r) => r.json());
   }
 
   computeDataStats(columns: IColumnDump[]): Promise<IRemoteStatistics[]> {
