@@ -15,6 +15,10 @@ def to_dict(result):
   return [{c: r[c] for c in columns} for r in result]
 
 
+def to_filter(column_dump):
+  pass
+
+
 def get_desc():
   return [
     dict(label='D', type='string', column='d'),
@@ -43,12 +47,13 @@ def get_row(row_id):
   return r[0]
 
 
-def post_stats(body):
-  return None
+def post_sort(body):
+  return []
 
 
 def post_stats(body):
-  return None
+  column_dumps = body
+  return []
 
 
 def get_column_stats(column):
@@ -56,30 +61,41 @@ def get_column_stats(column):
 
 
 def get_column_mapping_sample(column):
-  return None
+  r = db_session.execute('select id from rows limit 100')
+  return [row['id'] for row in r]
 
 
-def get_column_search(column):
-  return None
+def get_column_search(column, query):
+  r = db_session.execute('select id from rows where {} = :query'.format(column), params=dict(query=query))
+  return [row['id'] for row in r]
 
 
 def post_column_stats(column, body):
+  column_dump = body
   return None
 
 
 def post_ranking_column_stats(column, body):
+  ranking_dump = body['ranking']
+  column_dump = body['column']
   return None
 
 
 def post_ranking_stats(body):
-  return None
+  ranking_dump = body['ranking']
+  column_dumps = body['columns']
+  return []
 
 
 def post_ranking_group_stats(group, body):
-  return None
+  ranking_dump = body['ranking']
+  column_dumps = body['columns']
+  return []
 
 
 def post_ranking_group_column_stats(group, column, body):
+  ranking_dump = body['ranking']
+  column_dump = body['column']
   return None
 
 

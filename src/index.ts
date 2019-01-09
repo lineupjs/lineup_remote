@@ -65,5 +65,5 @@ Promise.all([
 ]).then(([desc, count]: [any[], number]) => {
   const provider = new RemoteDataProvider(new Server(count), desc, {});
 
-  const lineup = new LineUp(document.body, provider, {});
+  return new LineUp(document.body, provider, {});
 });

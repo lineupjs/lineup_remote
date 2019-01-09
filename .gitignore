@@ -13,3 +13,4 @@ node_modules/
 /tmp
 *.pyc
 *.egg-info/
+/public

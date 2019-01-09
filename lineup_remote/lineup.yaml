@@ -235,7 +235,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/RemoteStatistics'
-  /ranking/group/{group]/column/{column}/stats:
+  /ranking/group/{group}/column/{column}/stats:
     post:
       summary: get column data stats for a ranking group
       operationId: api.post_ranking_group_column_stats
@@ -257,7 +257,7 @@ paths:
                 $ref: '#/components/schemas/RemoteStatistics'
         '404':
           description: Column not found
-  /ranking/group/{group]/stats:
+  /ranking/group/{group}/stats:
     post:
       summary: get column data stats for a ranking
       operationId: api.post_ranking_group_stats
