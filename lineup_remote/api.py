@@ -103,11 +103,11 @@ def post_ranking_group_column_stats(group, column, body):
 logging.basicConfig(level=logging.INFO)
 db_session = _init_db('postgresql://lineup:lineup@postgres/lineup')
 app = FlaskApp(__name__)
-app.add_api('lineup.yaml')
+app.add_api('openapi.yaml')
 
 
 @app.app.route('/')
-def get_public(path):
+def get_index(path):
   from flask import send_from_directory
   return send_from_directory('../build', 'index.html')
 

@@ -26,7 +26,7 @@ class Server implements IServerData {
 
   sort(ranking: IServerRankingDump): Promise<{groups: IOrderedGroup[]; maxDataIndex: number;}> {
     // fix indices to typed array
-    return this.post(`/api/sort`, ranking);
+    return this.post(`/api/ranking/sort`, ranking);
   }
 
   view(indices: number[]): Promise<IRow[]> {
@@ -64,6 +64,7 @@ Promise.all([
   fetch('/api/count').then((r) => r.json())
 ]).then(([desc, count]: [any[], number]) => {
   const provider = new RemoteDataProvider(new Server(count), desc, {});
+  provider.ensureOneRanking();
 
   return new LineUp(document.body, provider, {});
 });

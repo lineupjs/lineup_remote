@@ -730,29 +730,33 @@ components:
           items:
             $ref: '#/components/schemas/RemoteColumnDump'
         sortCriteria:
-          type: object
-          required:
-            - asc
-            - col
-          properties:
-            asc:
-              type: boolean
-            col:
-              $ref: '#/components/schemas/RemoteColumnDump'
+          type: array
+          items:
+            type: object
+            required:
+              - asc
+              - col
+            properties:
+              asc:
+                type: boolean
+              col:
+                $ref: '#/components/schemas/RemoteColumnDump'
         groupCriteria:
           type: array
           items:
             $ref: '#/components/schemas/RemoteColumnDump'
         groupSortCriteria:
-          type: object
-          required:
-            - asc
-            - col
-          properties:
-            asc:
-              type: boolean
-            col:
-              $ref: '#/components/schemas/RemoteColumnDump'
+          type: array
+          items:
+            type: object
+            required:
+              - asc
+              - col
+            properties:
+              asc:
+                type: boolean
+              col:
+                $ref: '#/components/schemas/RemoteColumnDump'
     RemoteRankingColumnDump:
       type: object
       required:
