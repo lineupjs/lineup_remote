@@ -635,6 +635,7 @@ components:
               items:
                 type: number
                 format: float
+          additionalProperties: true
     CategoricalFilter:
       type: object
       required:
@@ -642,20 +643,42 @@ components:
         - filterMissing
       properties:
         filter:
-          oneOf:
-            - type: string
-            - type: array
-              items:
-                type: string
+          type: array
+          items:
+            type: string
         filterMissing:
           type: boolean
     CategoricalColumnDump:
-      allOf:
-        - $ref: '#/components/schemas/ColumnDump'
-        - type: object
+      type: object
+      properties:
+      required:
+        - id
+        - desc
+      properties:
+        id:
+          type: string
+        desc:
+          oneOf:
+            - type: string
+            - type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+        filter:
+          type: object
+          required:
+            - filter
+            - filterMissing
           properties:
             filter:
-              $ref: '#/components/schemas/CategoricalFilter'
+              type: array
+              items:
+                type: string
+            filterMissing:
+              type: boolean
+      additionalProperties: true
     DateColumnDump:
       allOf:
         - $ref: '#/components/schemas/ColumnDump'
@@ -685,6 +708,7 @@ components:
                     - second
                 circular:
                   type: boolean
+          additionalProperties: true
     StringColumnDump:
       allOf:
         - $ref: '#/components/schemas/ColumnDump'
@@ -696,12 +720,13 @@ components:
               type: array
               items:
                 type: string
+          additionalProperties: true
     RemoteColumnDump:
       oneOf:
         - $ref: '#/components/schemas/CategoricalColumnDump'
-        - $ref: '#/components/schemas/DateColumnDump'
-        - $ref: '#/components/schemas/NumberColumnDump'
-        - $ref: '#/components/schemas/StringColumnDump'
+        # - $ref: '#/components/schemas/DateColumnDump'
+        # - $ref: '#/components/schemas/NumberColumnDump'
+        # - $ref: '#/components/schemas/StringColumnDump'
         - type: object
           additionalProperties: true
     ServerRankingDump:

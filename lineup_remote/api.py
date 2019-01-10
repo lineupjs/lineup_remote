@@ -46,7 +46,9 @@ def get_row(row_id):
 def post_sort(body):
   ranking_dump = parse_ranking_dump(body)
 
-  r = db_session.execute('select id from rows')
+  filter_sql, args = ranking_dump.to_filter()
+
+  r = db_session.execute('select id from rows ' + ('where ' + filter_sql if filter_sql else ''), params=args)
   ids = [row['id'] for row in r]
   return {
     'groups': [
@@ -56,7 +58,7 @@ def post_sort(body):
         'order': ids
       }
     ],
-    'maxDataIndex': ids[-1]
+    'maxDataIndex': max(ids)
   }
 
 
@@ -169,7 +171,7 @@ app.add_api('openapi.yaml')
 
 
 @app.app.route('/')
-def get_index(path):
+def get_index():
   from flask import send_from_directory
   return send_from_directory('../build', 'index.html')
 
