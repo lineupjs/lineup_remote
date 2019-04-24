@@ -23,7 +23,6 @@ class NumberFilter:
     return sql.format(column), args
 
 
-
 class MappingFunction:
   def __init__(self, dump):
     self.type = dump['type']
@@ -140,6 +139,10 @@ class ServerRankingDump:
     for f in fs:
       args.update(f[1])
     return ' AND '.join(f[0] for f in fs), args
+
+
+  def to_sort(self):
+    return ''  # TODO
 
 
 def parse_ranking_dump(dump):

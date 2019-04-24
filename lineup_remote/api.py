@@ -17,6 +17,7 @@ def to_dict(result):
 
 
 def get_desc():
+  # TODO derive from DB
   return [
     dict(label='D', type='string', column='d'),
     dict(label='A', type='number', column='a', domain=[0, 1]),
@@ -49,6 +50,7 @@ def post_sort(body):
   filter_sql, args = ranking_dump.to_filter()
 
   r = db_session.execute('select id from rows ' + ('where ' + filter_sql if filter_sql else ''), params=args)
+  # TODO sort criteria
   ids = [row['id'] for row in r]
   return {
     'groups': [
@@ -75,52 +77,54 @@ def to_categorical_stats(c, missing, hist):
   )
 
 
-def post_stats(body):
-  column_dumps = [parse_column_dump(r) for r in body]
+def to_stat(dump):
+  c = parse_column_dump(dump)
 
-  stats = []
-  for c in column_dumps:
-    stat = None
-    if c.type == 'categorical':
-      missing = db_session.scalar('select count(*) as c from rows where {0} is null'.format(c.column))
-      r = db_session.execute('select {0} as cat, count(*) as count from rows group by {0}'.format(c.column))
-      stat = to_categorical_stats(c, missing, r)
-    elif c.type == 'number':
-      missing = db_session.scalar('select count(*) as c from rows where {0} is null'.format(c.column))
-      r = db_session.execute('select percentile_cont(ARRAY[0, 0.25, 0.5, 0.75, 1]) within group (order by {0}) as p, avg({0}) as mean, count(*) as count from rows where {0} is not null'.format(c.column)).first()
-      raw = {
-        'min': r['p'][0],
-        'max': r['p'][-1],
-        'mean': r['mean'],
-        'missing': missing,
-        'count': r['count'],
-        'maxBin': 0,
-        'hist': [] # TODO
-      }
-      raw_boxplot = {
-        'min': r['p'][0],
-        'q1': r['p'][1],
-        'median': r['p'][2],
-        'q3': r['p'][3],
-        'max': r['p'][-1],
-        'outlier': [],
-        'whiskerLow': r['p'][0],
-        'whiskerHigh': r['p'][-1],
-        'mean': r['mean'],
-        'missing': missing,
-        'count': r['count']
-      }
-      stat = {
-        'raw': raw,
-        'rawBoxPlot': raw_boxplot,
-        'normalized': raw, # TODO
-        'normalizedBoxPlot': raw_boxplot
-      }
-    stats.append(stat)
-  return stats
+  stat = None
+  if c.type == 'categorical':
+    missing = db_session.scalar('select count(*) as c from rows where {0} is null'.format(c.column))
+    r = db_session.execute('select {0} as cat, count(*) as count from rows group by {0}'.format(c.column))
+    stat = to_categorical_stats(c, missing, r)
+  elif c.type == 'number':
+    missing = db_session.scalar('select count(*) as c from rows where {0} is null'.format(c.column))
+    r = db_session.execute('select percentile_cont(ARRAY[0, 0.25, 0.5, 0.75, 1]) within group (order by {0}) as p, avg({0}) as mean, count(*) as count from rows where {0} is not null'.format(c.column)).first()
+    raw = {
+      'min': r['p'][0],
+      'max': r['p'][-1],
+      'mean': r['mean'],
+      'missing': missing,
+      'count': r['count'],
+      'maxBin': 0,
+      'hist': []  # TODO
+    }
+    raw_boxplot = {
+      'min': r['p'][0],
+      'q1': r['p'][1],
+      'median': r['p'][2],
+      'q3': r['p'][3],
+      'max': r['p'][-1],
+      'outlier': [],
+      'whiskerLow': r['p'][0],
+      'whiskerHigh': r['p'][-1],
+      'mean': r['mean'],
+      'missing': missing,
+      'count': r['count']
+    }
+    stat = {
+      'raw': raw,
+      'rawBoxPlot': raw_boxplot,
+      'normalized': raw,  # TODO
+      'normalizedBoxPlot': raw_boxplot  # TODO
+    }
+  return stat
+
+
+def post_stats(body):
+  return [to_stat(r) for r in body]
 
 
 def get_column_stats(column):
+  # TODO
   return None
 
 
@@ -136,30 +140,35 @@ def get_column_search(column, query):
 
 def post_column_stats(column, body):
   column_dump = parse_column_dump(body)
+  # TODO
   return None
 
 
 def post_ranking_column_stats(column, body):
   ranking_dump = parse_ranking_dump(body['ranking'])
   column_dump = parse_column_dump(body['column'])
+  # TODO
   return None
 
 
 def post_ranking_stats(body):
   ranking_dump = parse_ranking_dump(body['ranking'])
   column_dumps = [parse_column_dump(r) for r in body['columns']]
+  # TODO
   return post_stats(body['columns'])
 
 
 def post_ranking_group_stats(group, body):
   ranking_dump = parse_ranking_dump(body['ranking'])
   column_dumps = [parse_column_dump(r) for r in body['columns']]
+  # TODO
   return post_stats(body['columns'])
 
 
 def post_ranking_group_column_stats(group, column, body):
   ranking_dump = parse_ranking_dump(body['ranking'])
   column_dump = parse_column_dump(body['column'])
+  # TODO
   return None
 
 
