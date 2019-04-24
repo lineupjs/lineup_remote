@@ -52,7 +52,7 @@ BEGIN
 
   RETURN json_build_object('min', percentiles[1], 'q1', q1, 'median', percentiles[3], 'q3', q3, 'max', percentiles[5], 'outlier', outliers, 'whiskerLow', lower_whisker, 'whiskerHigh', upper_whisker);
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql IMMUTABLE;
 
 CREATE AGGREGATE boxplot (double precision)
 (
@@ -60,4 +60,41 @@ CREATE AGGREGATE boxplot (double precision)
     stype = double precision[],
     initcond = '{}',
     finalfunc = compute_boxplot
+);
+
+
+-- https://wiki.postgresql.org/wiki/Aggregate_Histogram
+-- HISTOGRAM
+
+CREATE OR REPLACE FUNCTION histogram_sfunc(state integer[], val double precision, min_value double precision, max_value double precision, nbuckets integer)
+RETURNS integer[]
+AS $$
+DECLARE
+  bucket integer;
+  i integer;
+BEGIN
+  -- do nothing if val is NULL
+  IF val IS NULL THEN
+     RETURN state;
+  END IF;
+
+  -- This will put values in buckets with a 0 bucket for <MIN and a (nbuckets+1) bucket for >=MAX
+  bucket := min(max(width_bucket(val, min_value, max_value, nbuckets) - 1, 0), nbuckets);
+
+  -- Init the array with the correct number of 0's so the caller doesn't see NULLs
+  IF state[0] IS NULL THEN
+    state := array_fill(0, ARRAY[nbuckets], ARRAY[0]);
+  END IF;
+
+  state[bucket] := state[bucket] + 1;
+
+  RETURN state;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+DROP AGGREGATE IF EXISTS histogram (double precision, double precision, double precision, integer);
+CREATE AGGREGATE histogram (val double precision, min_value double precision, max_value double precision, nbuckets integer) (
+       SFUNC = histogram_sfunc,
+       STYPE = INTEGER[],
+       PARALLEL = SAFE -- Remove line for compatibility with  Postgresql < 9.6
 );
