@@ -673,6 +673,7 @@ components:
             type: string
         filterMissing:
           type: boolean
+      additionalProperties: true
     CategoricalColumnDump:
       allOf:
         - $ref: '#/components/schemas/ColumnDump'
@@ -725,10 +726,10 @@ components:
           additionalProperties: true
     RemoteColumnDump:
       oneOf:
-        - $ref: '#/components/schemas/CategoricalColumnDump'
-        - $ref: '#/components/schemas/DateColumnDump'
-        - $ref: '#/components/schemas/NumberColumnDump'
-        - $ref: '#/components/schemas/StringColumnDump'
+        #- $ref: '#/components/schemas/CategoricalColumnDump'
+        #- $ref: '#/components/schemas/DateColumnDump'
+        #- $ref: '#/components/schemas/NumberColumnDump'
+        #- $ref: '#/components/schemas/StringColumnDump'
         - type: object
           additionalProperties: true
     ServerRankingDump:

@@ -57,7 +57,6 @@ def post_sort(body):
   order_by = ranking_dump.to_sort()
 
   query = 'select id from rows {0} {1}'.format(where, order_by)
-  print(query)
 
   r = db_session.execute(query, params=args)
 
