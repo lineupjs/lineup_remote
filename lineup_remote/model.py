@@ -9,7 +9,7 @@ class NumberFilter:
   def to_sql(self, column):
     args = dict()
     if self.min is not None and self.max is not None:
-      sql = '{0} between :{0}_min and {0}_max'
+      sql = '{0} between :{0}_min and :{0}_max'
       args[column + '_min'] = self.min
       args[column + '_max'] = self.max
     elif self.min is not None:
