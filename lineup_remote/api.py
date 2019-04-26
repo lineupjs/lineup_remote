@@ -78,7 +78,32 @@ def to_categorical_stats(c, hist):
   )
 
 
+def number_of_bins(length):
+  if (length == 0):
+    return 1
+  # as by default used in d3 the Sturges' formula
+  import math
+
+  return math.ceil(math.log2(length)) + 1
+
+
 def to_number_stats(c, stats):
+  domain = c.map.domain
+
+  def to_hist(hist):
+    bins = len(hist)
+    x0 = domain[0]
+    delta = (domain[1] - domain[0]) / bins
+    histogram = []
+    for i in range(bins - 1):
+      x1 = x0 + delta
+      histogram.append(dict(count=hist[i], x0=x0, x1=x1))
+      x0 = x1
+
+    # last bin separately to ensure x1 is
+    histogram.append(dict(count=hist[-1], x0=x0, x1=domain[1]))
+    return histogram
+
   raw = {
     'min': stats['min'],
     'max': stats['max'],
@@ -86,7 +111,7 @@ def to_number_stats(c, stats):
     'missing': stats['missing'],
     'count': stats['count'],
     'maxBin': max(stats['hist']),
-    'hist': stats['hist']
+    'hist': to_hist(stats['hist'])
   }
   raw_boxplot = {
     'min': stats['min'],
@@ -110,14 +135,13 @@ def to_number_stats(c, stats):
 
 
 def to_stat(c):
-
   stat = None
   if c.type == 'categorical':
     r = db_session.execute('select {0} as cat, count(*) as count from rows group by {0}'.format(c.column))
     stat = to_categorical_stats(c, r)
   elif c.type == 'number':
-    # TODO proper bin count
-    r = db_session.execute('select stats({c}, 5, {d[0]}, {d[1]}) as stats from rows'.format(c=c.column, d=c.map.domain)).first()
+    bins = number_of_bins(db_session.execute('select count(*) as c from rows').first()['c'])
+    r = db_session.execute('select stats({c}, {bins}, {d[0]}, {d[1]}) as stats from rows'.format(c=c.column, bins=bins, d=c.map.domain)).first()
     stat = to_number_stats(c, r['stats'])
   # TODO support dates
   return stat
@@ -129,11 +153,12 @@ def post_stats(body):
   # compute all numbers at once
   if numbers:
     # TODO proper bin count
-    keys = ', '.join(['stats({c}, 5, {d[0]}, {d[1]}) as stats{i}'.format(c=c.column, d=c.map.domain, i=i) for i, c in enumerate(numbers)])
+    bins = number_of_bins(db_session.execute('select count(*) as c from rows').first()['c'])
+    keys = ', '.join(['stats({c}, {bins}, {d[0]}, {d[1]}) as stats{i}'.format(c=c.column, bins=bins, d=c.map.domain, i=i) for i, c in enumerate(numbers)])
     r = db_session.execute('select ' + keys + ' from rows').first()
     numberStats = [r['stats{0}'.format(i)] for i in range(len(numbers))]
 
-  return [to_number_stats(c, numbers.pop(0)) if c.type == 'number' else to_stat(c) for c in cols]
+  return [to_number_stats(c, numberStats.pop(0)) if c.type == 'number' else to_stat(c) for c in cols]
 
 
 def get_column_stats(column):
