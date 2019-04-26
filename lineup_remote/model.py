@@ -129,6 +129,11 @@ class SortCriteria:
     self.col = parse_column_dump(dump['col'])
     self.asc = dump['asc']
 
+  def to_clause(self):
+    if self.asc:
+      return self.col.column
+    return self.col.column + ' DESC'
+
 
 class ServerRankingDump:
   def __init__(self, dump):
@@ -146,11 +151,14 @@ class ServerRankingDump:
 
   def to_where(self):
     filter_sql, args = self.to_filter()
-    where = ('where ' + filter_sql if filter_sql else '')
+    where = ('WHERE ' + filter_sql if filter_sql else '')
     return where, args
 
   def to_sort(self):
-    return ''  # TODO
+    clauses = [c.to_clause() for c in self.sort_criteria]
+    if not clauses:
+      return ''
+    return 'ORDER BY ' + ', '.join(clauses)
 
 
 def parse_ranking_dump(dump):

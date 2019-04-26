@@ -591,6 +591,8 @@ components:
               properties:
                 type:
                   type: string
+              additionalProperties: true
+      additionalProperties: true
     NumberFilter:
       type: object
       required:

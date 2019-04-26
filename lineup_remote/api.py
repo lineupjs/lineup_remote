@@ -51,10 +51,11 @@ def get_row(row_id):
 def post_sort(body):
   ranking_dump = parse_ranking_dump(body)
 
-  filter_sql, args = ranking_dump.to_filter()
+  where, args = ranking_dump.to_where()
+  order_by = ranking_dump.to_sort()
 
-  r = db_session.execute('select id from rows ' + ('where ' + filter_sql if filter_sql else ''), params=args)
-  # TODO sort criteria
+  r = db_session.execute('select id from rows {0} {1}'.format(where, order_by), params=args)
+
   ids = [row['id'] for row in r]
   return {
     'groups': [
