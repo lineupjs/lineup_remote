@@ -30,7 +30,7 @@ class MappingFunction:
     self.range = dump['range']
 
   def to_query(self, column):
-    return '{c.type}_mapping({column}, {c.domain[0]}, {c.domain[1]}, {c.range[0]}, {c.range[1]})'.format(column=column, c=self)
+    return 'map_value({column}, \'{c.type}\', {c.domain[0]}, {c.domain[1]}, {c.range[0]}, {c.range[1]})'.format(column=column, c=self)
 
 
 class DateGrouper:

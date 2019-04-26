@@ -160,13 +160,44 @@ CREATE AGGREGATE histogram (val double precision, min_value double precision, ma
 
 -- MAPPING functions
 
-CREATE OR REPLACE FUNCTION linear_mapping(val double precision, domain0 double precision, domain1 double precision, range0 double precision, range1 double precision)
+CREATE OR REPLACE FUNCTION map_value(val double precision, type text, domain0 double precision, domain1 double precision, range0 double precision, range1 double precision)
 RETURNS double precision
 AS $$
 DECLARE
   normalized double precision;
+  v double precision;
+  d0 double precision;
+  d1 double precision;
 BEGIN
-  normalized := (val - domain0) / (domain1 - domain0);
+  CASE type
+  WHEN 'log' THEN
+    v := ln(val);
+    d0 := ln(domain0);
+    d1 := ln(domain1);
+  WHEN 'sqrt' THEN
+    v := sqrt(val);
+    d0 := sqrt(domain0);
+    d1 := sqrt(domain1);
+  WHEN 'pow1.1' THEN
+    v := power(val, 1.1);
+    d0 := power(domain0, 1.1);
+    d1 := power(domain1, 1.1);
+  WHEN 'pow2' THEN
+    v := power(val, 2);
+    d0 := power(domain0, 2);
+    d1 := power(domain1, 2);
+  WHEN 'pow3' THEN
+    v := power(val, 3);
+    d0 := power(domain0, 3);
+    d1 := power(domain1, 3);
+  ELSE
+    v := val;
+    d0 := domain0;
+    d1 := domain1;
+  END CASE;
+
+  normalized := (v - d0) / (d1 - d0);
+
   RETURN normalized * (range1 - range0) + range0;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
