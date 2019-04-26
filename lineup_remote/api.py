@@ -87,9 +87,9 @@ def to_stat(dump):
     stat = to_categorical_stats(c, missing, r)
   elif c.type == 'number':
     missing = db_session.scalar('select count(*) as c from rows where {0} is null'.format(c.column))
-    r = db_session.execute('select percentile_cont(ARRAY[0, 0.25, 0.5, 0.75, 1]) within group (order by {0}) as p, avg({0}) as mean, count(*) as count from rows where {0} is not null'.format(c.column)).first()
+    r = db_session.execute('select boxplot({0}) as boxplot, count(*) as count from rows where {0} is not null'.format(c.column)).first()
     raw = {
-      'min': r['p'][0],
+      'min': r['boxplot'][],
       'max': r['p'][-1],
       'mean': r['mean'],
       'missing': missing,

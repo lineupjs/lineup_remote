@@ -17,12 +17,44 @@ INSERT INTO rows(d, a, cat, cat2)
          (ARRAY['a1','a2'])[ceil(random()*2)] as cat2;
 
 
--- mean,missing,count - hist,maxBin
+-- stats aggregation function
 
-DROP AGGREGATE IF EXISTS boxplot (double precision);
-DROP FUNCTION IF EXISTS compute_boxplot(double precision[]);
+DROP TYPE IF EXISTS stats_stype CASCADE;
+CREATE TYPE stats_stype AS (values double precision[], hist integer[], missing integer);
 
-CREATE FUNCTION compute_boxplot(arr double precision[])
+CREATE OR REPLACE FUNCTION stats_sfunc(state stats_stype, val double precision, nbuckets integer, min_hist double precision, max_hist double precision)
+RETURNS stats_stype
+AS $$
+DECLARE
+  bucket integer;
+  i integer;
+BEGIN
+    -- Init the array with the correct number of 0's so the caller doesn't see NULLs
+    IF state.hist[0] IS NULL THEN
+      state.hist := array_fill(0, ARRAY[nbuckets], ARRAY[0]);
+    END IF;
+
+	IF val IS NULL
+	THEN
+		state.missing := state.missing + 1;
+	ELSE
+		state.values := array_append(state.values, val);
+		-- This will put values in buckets with a 0 bucket for <MIN and a (nbuckets+1) bucket for >=MAX
+	    bucket := width_bucket(val, min_hist, max_hist, nbuckets) - 1;
+        IF bucket < 0 THEN
+          bucket := 0;
+		ELSE IF bucket > nbuckets THEN
+          bucket := nbuckets;
+        END IF;
+	    END IF;
+
+        state.hist[bucket] := state.hist[bucket] + 1;
+	END IF;
+	RETURN state;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION stats_ffunc(state stats_stype)
 RETURNS json
 AS $$
 DECLARE
@@ -35,8 +67,15 @@ DECLARE
   max_whisker double precision;
   min_whisker double precision;
   outliers double precision[];
+  mean double precision;
+  arr double precision[];
 BEGIN
-  percentiles := percentile_cont(ARRAY[0, 0.25, 0.5, 0.75, 1]) WITHIN GROUP (ORDER BY v ASC) FROM unnest(arr) AS t(v);
+  arr := state.values;
+
+  SELECT
+    percentile_cont(ARRAY[0, 0.25, 0.5, 0.75, 1]) WITHIN GROUP (ORDER BY v ASC), avg(v)
+  INTO percentiles, mean
+  FROM unnest(arr) AS t(v);
 
   q1 := percentiles[2];
   q3 := percentiles[4];
@@ -50,18 +89,32 @@ BEGIN
 
   outliers := array_agg(v ORDER BY v ASC) FROM unnest(arr) as t(v) WHERE v < min_whisker OR v > max_whisker;
 
-  RETURN json_build_object('min', percentiles[1], 'q1', q1, 'median', percentiles[3], 'q3', q3, 'max', percentiles[5], 'outlier', outliers, 'whiskerLow', lower_whisker, 'whiskerHigh', upper_whisker);
+  RETURN json_build_object(
+    'min', percentiles[1],
+    'q1', q1,
+    'median', percentiles[3],
+    'q3', q3,
+    'max', percentiles[5],
+    'outlier', outliers,
+    'whiskerLow', lower_whisker,
+    'whiskerHigh', upper_whisker,
+    'mean', mean,
+    'count', array_length(arr, 1),
+    'missing', state.missing,
+    'hist', state.hist
+  );
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
-CREATE AGGREGATE boxplot (double precision)
-(
-    sfunc = array_append,
-    stype = double precision[],
-    initcond = '{}',
-    finalfunc = compute_boxplot
-);
 
+DROP AGGREGATE IF EXISTS stats (double precision, integer, double precision, double precision);
+CREATE AGGREGATE stats (val double precision, nbuckets integer, min_hist double precision, max_hist double precision)
+(
+    sfunc = stats_sfunc,
+    stype = stats_stype,
+    initcond = '({},{},0)',
+    finalfunc = stats_ffunc
+);
 
 -- https://wiki.postgresql.org/wiki/Aggregate_Histogram
 -- HISTOGRAM
