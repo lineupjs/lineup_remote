@@ -92,7 +92,7 @@ def to_categorical_stats(c, hist):
   return dict(
     missing=missing,
     count=count,
-    maxBin=max((v['count'] for v in lookup.values()), 0),
+    maxBin=max((v['count'] for v in lookup.values()), default=0),
     hist=[lookup.get(c, dict(cat=c, color='gray', count=0)) for c in categories]
   )
 
@@ -127,9 +127,9 @@ def to_number_stats(c, stats, normalized_stats):
       'min': stats['min'],
       'max': stats['max'],
       'mean': stats['mean'],
-      'missing': stats['missing'],
-      'count': stats['count'],
-      'maxBin': max(stats['hist']),
+      'missing': stats['missing'] or 0,
+      'count': stats['count'] or 0,
+      'maxBin': max(stats['hist'], default=0),
       'hist': to_hist(stats['hist'], domain)
     }
     boxplot = {
@@ -138,12 +138,12 @@ def to_number_stats(c, stats, normalized_stats):
       'median': stats['median'],
       'q3': stats['q3'],
       'max': stats['max'],
-      'outlier': stats['outlier'],
+      'outlier': stats['outlier'] or [],
       'whiskerLow': stats['whiskerLow'],
       'whiskerHigh': stats['whiskerHigh'],
       'mean': stats['mean'],
-      'missing': stats['missing'],
-      'count': stats['count'],
+      'missing': stats['missing'] or 0,
+      'count': stats['count'] or 0,
     }
     return s, boxplot
 
