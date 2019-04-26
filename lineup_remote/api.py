@@ -7,7 +7,7 @@ db_session = None
 def _init_db(uri):
   from sqlalchemy import create_engine
   from sqlalchemy.orm import scoped_session, sessionmaker
-  engine = create_engine(uri, convert_unicode=True)
+  engine = create_engine(uri, convert_unicode=True, echo=True)
   return scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 
 
@@ -33,7 +33,9 @@ def get_count():
 def get_rows(ids=None):
   if not ids:
     return to_dict(db_session.execute('select * from rows'))
-  return to_dict(db_session.execute('select * from rows where id = any(:ids)', params=dict(ids=ids)))
+  lookup = {r['id']: r for r in to_dict(db_session.execute('select * from rows where id = any(:ids)', params=dict(ids=ids)))}
+  # ensure incoming order
+  return [lookup.get(id) for id in ids]
 
 
 def post_rows(body):
@@ -54,7 +56,10 @@ def post_sort(body):
   where, args = ranking_dump.to_where()
   order_by = ranking_dump.to_sort()
 
-  r = db_session.execute('select id from rows {0} {1}'.format(where, order_by), params=args)
+  query = 'select id from rows {0} {1}'.format(where, order_by)
+  print(query)
+
+  r = db_session.execute(query, params=args)
 
   ids = [row['id'] for row in r]
   return {
@@ -209,7 +214,7 @@ def post_ranking_stats(body):
 def post_ranking_group_stats(group, body):
   ranking_dump = parse_ranking_dump(body['ranking'])
   column_dumps = [parse_column_dump(r) for r in body['columns']]
-  # TODO ranking and group filter
+  # TODO group filter
   where, args = ranking_dump.to_where()
   return to_stats(column_dumps, where, args)
 
@@ -217,7 +222,7 @@ def post_ranking_group_stats(group, body):
 def post_ranking_group_column_stats(group, column, body):
   ranking_dump = parse_ranking_dump(body['ranking'])
   column_dump = parse_column_dump(body['column'])
-  # TODO ranking and group filter
+  # TODO group filter
   where, args = ranking_dump.to_where()
   return to_stats([column_dump], where, args)[0]
 
