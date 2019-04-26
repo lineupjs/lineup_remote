@@ -156,3 +156,17 @@ CREATE AGGREGATE histogram (val double precision, min_value double precision, ma
        STYPE = INTEGER[],
        PARALLEL = SAFE -- Remove line for compatibility with  Postgresql < 9.6
 );
+
+
+-- MAPPING functions
+
+CREATE OR REPLACE FUNCTION linear_mapping(val double precision, domain0 double precision, domain1 double precision, range0 double precision, range1 double precision)
+RETURNS double precision
+AS $$
+DECLARE
+  normalized double precision;
+BEGIN
+  normalized := (val - domain0) / (domain1 - domain0);
+  RETURN normalized * (range1 - range0) + range0;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;

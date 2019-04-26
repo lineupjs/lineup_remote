@@ -36,6 +36,10 @@ def get_rows(ids=None):
   return to_dict(db_session.execute('select * from rows where id = any(:ids)', params=dict(ids=ids)))
 
 
+def post_rows(body):
+  return get_rows(body)
+
+
 def get_row(row_id):
   r = db_session.execute('select * from rows where id = :row_id', params=dict(row_id=row_id))
   r = to_dict(r)
@@ -87,10 +91,9 @@ def number_of_bins(length):
   return math.ceil(math.log2(length)) + 1
 
 
-def to_number_stats(c, stats):
-  domain = c.map.domain
+def to_number_stats(c, stats, normalized_stats):
 
-  def to_hist(hist):
+  def to_hist(hist, domain):
     bins = len(hist)
     x0 = domain[0]
     delta = (domain[1] - domain[0]) / bins
@@ -104,33 +107,38 @@ def to_number_stats(c, stats):
     histogram.append(dict(count=hist[-1], x0=x0, x1=domain[1]))
     return histogram
 
-  raw = {
-    'min': stats['min'],
-    'max': stats['max'],
-    'mean': stats['mean'],
-    'missing': stats['missing'],
-    'count': stats['count'],
-    'maxBin': max(stats['hist']),
-    'hist': to_hist(stats['hist'])
-  }
-  raw_boxplot = {
-    'min': stats['min'],
-    'q1': stats['q1'],
-    'median': stats['median'],
-    'q3': stats['q3'],
-    'max': stats['max'],
-    'outlier': stats['outlier'],
-    'whiskerLow': stats['whiskerLow'],
-    'whiskerHigh': stats['whiskerHigh'],
-    'mean': stats['mean'],
-    'missing': stats['missing'],
-    'count': stats['count'],
-  }
+  def to_stat(stats, domain):
+    s = {
+      'min': stats['min'],
+      'max': stats['max'],
+      'mean': stats['mean'],
+      'missing': stats['missing'],
+      'count': stats['count'],
+      'maxBin': max(stats['hist']),
+      'hist': to_hist(stats['hist'], domain)
+    }
+    boxplot = {
+      'min': stats['min'],
+      'q1': stats['q1'],
+      'median': stats['median'],
+      'q3': stats['q3'],
+      'max': stats['max'],
+      'outlier': stats['outlier'],
+      'whiskerLow': stats['whiskerLow'],
+      'whiskerHigh': stats['whiskerHigh'],
+      'mean': stats['mean'],
+      'missing': stats['missing'],
+      'count': stats['count'],
+    }
+    return s, boxplot
+
+  raw, raw_boxplot = to_stat(stats, c.map.domain)
+  normalized, normalized_boxplot = to_stat(normalized_stats, [0, 1])
   return {
     'raw': raw,
     'rawBoxPlot': raw_boxplot,
-    'normalized': raw,  # TODO
-    'normalizedBoxPlot': raw_boxplot  # TODO
+    'normalized': normalized,
+    'normalizedBoxPlot': normalized_boxplot
   }
 
 
@@ -141,8 +149,8 @@ def to_stat(c):
     stat = to_categorical_stats(c, r)
   elif c.type == 'number':
     bins = number_of_bins(db_session.execute('select count(*) as c from rows').first()['c'])
-    r = db_session.execute('select stats({c}, {bins}, {d[0]}, {d[1]}) as stats from rows'.format(c=c.column, bins=bins, d=c.map.domain)).first()
-    stat = to_number_stats(c, r['stats'])
+    r = db_session.execute('select stats({c}, {bins}, {d[0]}, {d[1]}) as stats, stats({n}, {bins}, 0, 1) as nstats from rows'.format(c=c.column, n=c.mapped_column, bins=bins, d=c.map.domain)).first()
+    stat = to_number_stats(c, r['stats'], r['nstats'])
   # TODO support dates
   return stat
 
@@ -152,13 +160,14 @@ def post_stats(body):
   numbers = [c for c in cols if c.type == 'number']
   # compute all numbers at once
   if numbers:
-    # TODO proper bin count
     bins = number_of_bins(db_session.execute('select count(*) as c from rows').first()['c'])
-    keys = ', '.join(['stats({c}, {bins}, {d[0]}, {d[1]}) as stats{i}'.format(c=c.column, bins=bins, d=c.map.domain, i=i) for i, c in enumerate(numbers)])
+    keys = ', '.join(['stats({c}, {bins}, {d[0]}, {d[1]}) as stats{i}, stats({n}, {bins}, 0, 1) as nstats{i}'.format(c=c.column, n=c.mapped_column, bins=bins, d=c.map.domain, i=i) for i, c in enumerate(numbers)])
+    print(keys)
     r = db_session.execute('select ' + keys + ' from rows').first()
-    numberStats = [r['stats{0}'.format(i)] for i in range(len(numbers))]
+    number_stats = [r['stats{0}'.format(i)] for i in range(len(numbers))]
+    number_nstats = [r['nstats{0}'.format(i)] for i in range(len(numbers))]
 
-  return [to_number_stats(c, numberStats.pop(0)) if c.type == 'number' else to_stat(c) for c in cols]
+  return [to_number_stats(c, number_stats.pop(0), number_nstats.pop(0)) if c.type == 'number' else to_stat(c) for c in cols]
 
 
 def get_column_stats(column):

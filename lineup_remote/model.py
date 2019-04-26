@@ -29,6 +29,9 @@ class MappingFunction:
     self.domain = dump['domain']
     self.range = dump['range']
 
+  def to_query(self, column):
+    return '{c.type}_mapping({column}, {c.domain[0]}, {c.domain[1]}, {c.range[0]}, {c.range[1]})'.format(column=column, c=self)
+
 
 class DateGrouper:
   def __init__(self, dump):
@@ -82,6 +85,7 @@ class NumberColumnDump(ColumnDump):
     self.filter = NumberFilter(dump['filter']) if dump.get('filter') else None
     self.group_sort_method = dump['groupSortMethod']
     self.stratify_thresholds = dump['stratifyThresholds'] if dump.get('stratifyThresholds') else None
+    self.mapped_column = self.map.to_query(self.column)
 
 
 class DateColumnDump(ColumnDump):
