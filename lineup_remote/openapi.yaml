@@ -672,36 +672,13 @@ components:
         filterMissing:
           type: boolean
     CategoricalColumnDump:
-      type: object
-      properties:
-      required:
-        - id
-        - desc
-      properties:
-        id:
-          type: string
-        desc:
-          oneOf:
-            - type: string
-            - type: object
-              required:
-                - type
-              properties:
-                type:
-                  type: string
-        filter:
-          type: object
-          required:
-            - filter
-            - filterMissing
+      allOf:
+        - $ref: '#/components/schemas/ColumnDump'
+        - type: object
           properties:
             filter:
-              type: array
-              items:
-                type: string
-            filterMissing:
-              type: boolean
-      additionalProperties: true
+              $ref: '#/components/schemas/CategoricalFilter'
+          additionalProperties: true
     DateColumnDump:
       allOf:
         - $ref: '#/components/schemas/ColumnDump'
@@ -747,9 +724,9 @@ components:
     RemoteColumnDump:
       oneOf:
         - $ref: '#/components/schemas/CategoricalColumnDump'
-        # - $ref: '#/components/schemas/DateColumnDump'
-        # - $ref: '#/components/schemas/NumberColumnDump'
-        # - $ref: '#/components/schemas/StringColumnDump'
+        - $ref: '#/components/schemas/DateColumnDump'
+        - $ref: '#/components/schemas/NumberColumnDump'
+        - $ref: '#/components/schemas/StringColumnDump'
         - type: object
           additionalProperties: true
     ServerRankingDump:

@@ -144,6 +144,10 @@ class ServerRankingDump:
       args.update(f[1])
     return ' AND '.join(f[0] for f in fs), args
 
+  def to_where(self):
+    filter_sql, args = self.to_filter()
+    where = ('where ' + filter_sql if filter_sql else '')
+    return where, args
 
   def to_sort(self):
     return ''  # TODO

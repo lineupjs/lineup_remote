@@ -142,36 +142,35 @@ def to_number_stats(c, stats, normalized_stats):
   }
 
 
-def to_stat(c):
-  stat = None
-  if c.type == 'categorical':
-    r = db_session.execute('select {0} as cat, count(*) as count from rows group by {0}'.format(c.column))
-    stat = to_categorical_stats(c, r)
-  elif c.type == 'number':
-    bins = number_of_bins(db_session.execute('select count(*) as c from rows').first()['c'])
-    r = db_session.execute('select stats({c}, {bins}, {d[0]}, {d[1]}) as stats, stats({n}, {bins}, 0, 1) as nstats from rows'.format(c=c.column, n=c.mapped_column, bins=bins, d=c.map.domain)).first()
-    stat = to_number_stats(c, r['stats'], r['nstats'])
-  # TODO support dates
-  return stat
-
-
-def post_stats(body):
-  cols = [parse_column_dump(dump) for dump in body]
+def to_stats(cols, where = '', params = {}):
   numbers = [c for c in cols if c.type == 'number']
   # compute all numbers at once
   if numbers:
+    # always on all data
     bins = number_of_bins(db_session.execute('select count(*) as c from rows').first()['c'])
+
     keys = ', '.join(['stats({c}, {bins}, {d[0]}, {d[1]}) as stats{i}, stats({n}, {bins}, 0, 1) as nstats{i}'.format(c=c.column, n=c.mapped_column, bins=bins, d=c.map.domain, i=i) for i, c in enumerate(numbers)])
-    print(keys)
-    r = db_session.execute('select ' + keys + ' from rows').first()
+    r = db_session.execute('select {0} from rows {1}'.format(keys, where), params=params).first()
     number_stats = [r['stats{0}'.format(i)] for i in range(len(numbers))]
     number_nstats = [r['nstats{0}'.format(i)] for i in range(len(numbers))]
+
+  def to_stat(c):
+    if c.type == 'categorical':
+      r = db_session.execute('select {0} as cat, count(*) as count from rows {1} group by {0}'.format(c.column, where), params=params)
+      return to_categorical_stats(c, r)
+    return None
+    # TODO support dates
 
   return [to_number_stats(c, number_stats.pop(0), number_nstats.pop(0)) if c.type == 'number' else to_stat(c) for c in cols]
 
 
+def post_stats(body):
+  cols = [parse_column_dump(dump) for dump in body]
+  return to_stats(cols)
+
+
 def get_column_stats(column):
-  # TODO
+  # TODO lookup the column its type and then compute the stats
   return None
 
 
@@ -187,36 +186,39 @@ def get_column_search(column, query):
 
 def post_column_stats(column, body):
   column_dump = parse_column_dump(body)
-  # TODO
-  return None
+  return to_stats([column_dump])[0]
 
 
 def post_ranking_column_stats(column, body):
   ranking_dump = parse_ranking_dump(body['ranking'])
   column_dump = parse_column_dump(body['column'])
-  # TODO
-  return None
+
+  where, args = ranking_dump.to_where()
+  return to_stats([column_dump], where, args)[0]
 
 
 def post_ranking_stats(body):
   ranking_dump = parse_ranking_dump(body['ranking'])
   column_dumps = [parse_column_dump(r) for r in body['columns']]
-  # TODO
-  return post_stats(body['columns'])
+
+  where, args = ranking_dump.to_where()
+  return to_stats(column_dumps, where, args)
 
 
 def post_ranking_group_stats(group, body):
   ranking_dump = parse_ranking_dump(body['ranking'])
   column_dumps = [parse_column_dump(r) for r in body['columns']]
-  # TODO
-  return post_stats(body['columns'])
+  # TODO ranking and group filter
+  where, args = ranking_dump.to_where()
+  return to_stats(column_dumps, where, args)
 
 
 def post_ranking_group_column_stats(group, column, body):
   ranking_dump = parse_ranking_dump(body['ranking'])
   column_dump = parse_column_dump(body['column'])
-  # TODO
-  return None
+  # TODO ranking and group filter
+  where, args = ranking_dump.to_where()
+  return to_stats([column_dump], where, args)[0]
 
 
 
