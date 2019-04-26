@@ -29,26 +29,25 @@ DECLARE
   bucket integer;
   i integer;
 BEGIN
-    -- Init the array with the correct number of 0's so the caller doesn't see NULLs
-    IF state.hist[0] IS NULL THEN
-      state.hist := array_fill(0, ARRAY[nbuckets], ARRAY[0]);
-    END IF;
+  -- Init the array with the correct number of 0's so the caller doesn't see NULLs
+  IF state.hist[0] IS NULL THEN
+    state.hist := array_fill(0, ARRAY[nbuckets], ARRAY[0]);
+  END IF;
 
-	IF val IS NULL
-	THEN
+	IF val IS NULL THEN
 		state.missing := state.missing + 1;
 	ELSE
 		state.values := array_append(state.values, val);
 		-- This will put values in buckets with a 0 bucket for <MIN and a (nbuckets+1) bucket for >=MAX
-	    bucket := width_bucket(val, min_hist, max_hist, nbuckets) - 1;
-        IF bucket < 0 THEN
-          bucket := 0;
-		ELSE IF bucket > nbuckets THEN
-          bucket := nbuckets;
-        END IF;
-	    END IF;
+    bucket := width_bucket(val, min_hist, max_hist, nbuckets) - 1;
+    IF bucket < 0 THEN
+      bucket := 0;
+    ELSE IF bucket > nbuckets THEN
+      bucket := nbuckets;
+    END IF;
+    END IF;
 
-        state.hist[bucket] := state.hist[bucket] + 1;
+    state.hist[bucket] := state.hist[bucket] + 1;
 	END IF;
 	RETURN state;
 END;
@@ -132,7 +131,13 @@ BEGIN
   END IF;
 
   -- This will put values in buckets with a 0 bucket for <MIN and a (nbuckets+1) bucket for >=MAX
-  bucket := min(max(width_bucket(val, min_value, max_value, nbuckets) - 1, 0), nbuckets);
+  bucket := width_bucket(val, min_value, max_value, nbuckets) - 1;
+  IF bucket < 0 THEN
+    bucket := 0;
+  ELSE IF bucket > nbuckets THEN
+    bucket := nbuckets;
+  END IF;
+  END IF;
 
   -- Init the array with the correct number of 0's so the caller doesn't see NULLs
   IF state[0] IS NULL THEN

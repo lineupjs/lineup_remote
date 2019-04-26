@@ -64,10 +64,11 @@ def post_sort(body):
   }
 
 
-def to_categorical_stats(c, missing, hist):
-  lookup = {row['cat']: dict(cat=row['cat'], color='gray', count=row['count']) for row in hist}
-  count = sum((v['count'] for v in lookup.values()), missing)
-  categories = ['c1', 'c2', 'c3'] if c.column == 'cat' else ['a1', 'a2']
+def to_categorical_stats(c, hist):
+  lookup = {row['cat']: dict(cat=row['cat'], color='gray', count=row['count']) for row in hist if row['cat'] is not None}
+  missing = next((row['count'] for row in hist if row['cat'] is None), 0)
+  count = sum((v['count'] for v in lookup.values()))
+  categories = ['c1', 'c2', 'c3'] if c.column == 'cat' else ['a1', 'a2']  # TODO generalize
 
   return dict(
     missing=missing,
@@ -77,50 +78,62 @@ def to_categorical_stats(c, missing, hist):
   )
 
 
-def to_stat(dump):
-  c = parse_column_dump(dump)
+def to_number_stats(c, stats):
+  raw = {
+    'min': stats['min'],
+    'max': stats['max'],
+    'mean': stats['mean'],
+    'missing': stats['missing'],
+    'count': stats['count'],
+    'maxBin': max(stats['hist']),
+    'hist': stats['hist']
+  }
+  raw_boxplot = {
+    'min': stats['min'],
+    'q1': stats['q1'],
+    'median': stats['median'],
+    'q3': stats['q3'],
+    'max': stats['max'],
+    'outlier': stats['outlier'],
+    'whiskerLow': stats['whiskerLow'],
+    'whiskerHigh': stats['whiskerHigh'],
+    'mean': stats['mean'],
+    'missing': stats['missing'],
+    'count': stats['count'],
+  }
+  return {
+    'raw': raw,
+    'rawBoxPlot': raw_boxplot,
+    'normalized': raw,  # TODO
+    'normalizedBoxPlot': raw_boxplot  # TODO
+  }
+
+
+def to_stat(c):
 
   stat = None
   if c.type == 'categorical':
-    missing = db_session.scalar('select count(*) as c from rows where {0} is null'.format(c.column))
     r = db_session.execute('select {0} as cat, count(*) as count from rows group by {0}'.format(c.column))
-    stat = to_categorical_stats(c, missing, r)
+    stat = to_categorical_stats(c, r)
   elif c.type == 'number':
-    missing = db_session.scalar('select count(*) as c from rows where {0} is null'.format(c.column))
-    r = db_session.execute('select boxplot({0}) as boxplot, count(*) as count from rows where {0} is not null'.format(c.column)).first()
-    raw = {
-      'min': r['boxplot'][],
-      'max': r['p'][-1],
-      'mean': r['mean'],
-      'missing': missing,
-      'count': r['count'],
-      'maxBin': 0,
-      'hist': []  # TODO
-    }
-    raw_boxplot = {
-      'min': r['p'][0],
-      'q1': r['p'][1],
-      'median': r['p'][2],
-      'q3': r['p'][3],
-      'max': r['p'][-1],
-      'outlier': [],
-      'whiskerLow': r['p'][0],
-      'whiskerHigh': r['p'][-1],
-      'mean': r['mean'],
-      'missing': missing,
-      'count': r['count']
-    }
-    stat = {
-      'raw': raw,
-      'rawBoxPlot': raw_boxplot,
-      'normalized': raw,  # TODO
-      'normalizedBoxPlot': raw_boxplot  # TODO
-    }
+    # TODO proper bin count
+    r = db_session.execute('select stats({c}, 5, {d[0]}, {d[1]}) as stats from rows'.format(c=c.column, d=c.map.domain)).first()
+    stat = to_number_stats(c, r['stats'])
+  # TODO support dates
   return stat
 
 
 def post_stats(body):
-  return [to_stat(r) for r in body]
+  cols = [parse_column_dump(dump) for dump in body]
+  numbers = [c for c in cols if c.type == 'number']
+  # compute all numbers at once
+  if numbers:
+    # TODO proper bin count
+    keys = ', '.join(['stats({c}, 5, {d[0]}, {d[1]}) as stats{i}'.format(c=c.column, d=c.map.domain, i=i) for i, c in enumerate(numbers)])
+    r = db_session.execute('select ' + keys + ' from rows').first()
+    numberStats = [r['stats{0}'.format(i)] for i in range(len(numbers))]
+
+  return [to_number_stats(c, numbers.pop(0)) if c.type == 'number' else to_stat(c) for c in cols]
 
 
 def get_column_stats(column):
