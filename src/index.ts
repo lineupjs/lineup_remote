@@ -33,6 +33,9 @@ class Server implements IServerData {
     if (indices.length === 1) {
       return fetch(`/api/row/${encodeURIComponent(indices[0].toString())}`).then((r) => r.json()).then((r) => [r]);
     }
+    if (indices.length > 100) {
+      return this.post(`/api/row/`, indices);
+    }
     return fetch(`/api/row/?ids=${encodeURIComponent(indices.join(','))}`).then((r) => r.json());
   }
 
