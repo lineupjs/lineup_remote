@@ -160,6 +160,12 @@ class ServerRankingDump:
       return ''
     return 'ORDER BY ' + ', '.join(clauses)
 
+  def to_group_by(self):
+    clauses = [c.column for c in self.group_criteria]
+    if not clauses:
+      return ''
+    return 'GROUP BY ' + ', '.join(clauses)
+
 
 def parse_ranking_dump(dump):
   return ServerRankingDump(dump)

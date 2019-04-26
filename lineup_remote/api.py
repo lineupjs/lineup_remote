@@ -56,20 +56,30 @@ def post_sort(body):
   where, args = ranking_dump.to_where()
   order_by = ranking_dump.to_sort()
 
-  query = 'select id from rows {0} {1}'.format(where, order_by)
+  if not ranking_dump.group_criteria:
+    query = 'select id from rows {0} {1}'.format(where, order_by)
+    r = db_session.execute(query, params=args)
 
-  r = db_session.execute(query, params=args)
-
-  ids = [row['id'] for row in r]
-  return {
-    'groups': [
+    ids = [row['id'] for row in r]
+    groups = [
       {
         'name': 'default group',
         'color': 'gray',
         'order': ids
       }
-    ],
-    'maxDataIndex': max(ids)
+    ]
+  else:
+    query = 'select {2}, array_agg(id) as ids from rows {0} {1} group by {2}'.format(where, order_by, ', '.join(c.column for c in ranking_dump.group_criteria))
+    r = db_session.execute(query, params=args)
+
+    groups = [{
+        'name': ' x '.join(row[g.column] or 'Missing values' for g in ranking_dump.group_criteria),
+        'color': 'gray',
+        'order': row['ids']
+     } for row in r]
+  return {
+    'groups': groups,
+    'maxDataIndex': max((max(g['order']) for g in groups))
   }
 
 
