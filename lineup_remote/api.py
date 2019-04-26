@@ -63,17 +63,17 @@ def post_sort(body):
     ids = [row['id'] for row in r]
     groups = [
       {
-        'name': 'default group',
+        'name': 'Default group',
         'color': 'gray',
         'order': ids
       }
     ]
   else:
-    query = 'select {2}, array_agg(id) as ids from rows {0} {1} group by {2}'.format(where, order_by, ', '.join(c.column for c in ranking_dump.group_criteria))
+    query = 'select {2} as name, array_agg(id) as ids from rows {0} {1} group by {3}'.format(where, order_by, ranking_dump.to_group_name(), ', '.join(c.column for c in ranking_dump.group_criteria))
     r = db_session.execute(query, params=args)
 
     groups = [{
-        'name': ' x '.join(row[g.column] or 'Missing values' for g in ranking_dump.group_criteria),
+        'name': row['name'],
         'color': 'gray',
         'order': row['ids']
      } for row in r]
@@ -92,7 +92,7 @@ def to_categorical_stats(c, hist):
   return dict(
     missing=missing,
     count=count,
-    maxBin=max(v['count'] for v in lookup.values()),
+    maxBin=max((v['count'] for v in lookup.values()), 0),
     hist=[lookup.get(c, dict(cat=c, color='gray', count=0)) for c in categories]
   )
 
@@ -223,16 +223,14 @@ def post_ranking_stats(body):
 def post_ranking_group_stats(group, body):
   ranking_dump = parse_ranking_dump(body['ranking'])
   column_dumps = [parse_column_dump(r) for r in body['columns']]
-  # TODO group filter
-  where, args = ranking_dump.to_where()
+  where, args = ranking_dump.to_where(group)
   return to_stats(column_dumps, where, args)
 
 
 def post_ranking_group_column_stats(group, column, body):
   ranking_dump = parse_ranking_dump(body['ranking'])
   column_dump = parse_column_dump(body['column'])
-  # TODO group filter
-  where, args = ranking_dump.to_where()
+  where, args = ranking_dump.to_where(group)
   return to_stats([column_dump], where, args)[0]
 
 

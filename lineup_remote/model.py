@@ -149,9 +149,15 @@ class ServerRankingDump:
       args.update(f[1])
     return ' AND '.join(f[0] for f in fs), args
 
-  def to_where(self):
+  def to_where(self, group = None):
     filter_sql, args = self.to_filter()
     where = ('WHERE ' + filter_sql if filter_sql else '')
+    if group:
+      args['groupname'] = group
+      if not where:
+        where = 'WHERE {0} = :groupname'.format(self.to_group_name())
+      else:
+        where += ' AND {0} = :groupname'.format(self.to_group_name())
     return where, args
 
   def to_sort(self):
@@ -165,6 +171,12 @@ class ServerRankingDump:
     if not clauses:
       return ''
     return 'GROUP BY ' + ', '.join(clauses)
+
+
+  def to_group_name(self):
+    if not self.group_criteria:
+      return '\'Default group\''
+    return 'CONCAT({0})'.format(', '.join('COALESCE({0}, \'Missing values\')'.format(g.column) for g in self.group_criteria))
 
 
 def parse_ranking_dump(dump):
