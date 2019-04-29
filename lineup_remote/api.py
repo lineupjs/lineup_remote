@@ -23,6 +23,7 @@ def get_desc():
     dict(label='A', type='number', column='a', domain=[0, 1]),
     dict(label='Cat', type='categorical', column='cat', categories=['c1', 'c2', 'c3']),
     dict(label='Cat Label', type='categorical', column='cat2', categories=['a1', 'a2']),
+    dict(label='Date', type='date', column='dd'),
   ]
 
 
@@ -97,9 +98,45 @@ def to_categorical_stats(c, hist):
     hist=hist
   )
 
-def to_date_stats(c, stats):
-  # TODO
-  return None
+
+def to_date_buckets(min_date, max_date):
+  delta = max_date - min_date
+
+  import datetime
+  from dateutil.relativedelta import relativedelta
+
+  if delta.days > 365:
+    # year mode
+    gran = 'year'
+    dd = relativedelta(years=1)
+    x0 = datetime.date(min_date.year, 1, 1)
+  elif delta.days > 30:
+    gran = 'month'
+    dd = relativedelta(months=1)
+    x0 = datetime.date(min_date.year, min_date.month, 1)
+  else:
+    gran = 'day'
+    dd = relativedelta(days=1)
+    x0 = datetime.date(min_date.year, min_date.month, min_date.day)
+
+  buckets = []
+  while x0 < max_date:
+    buckets.append(x0)
+    x0 = x0 + dd
+  buckets.append(x0)
+  return gran, buckets
+
+
+def to_date_stats(c, stats, granularity, buckets):
+  return {
+    'min': stats['min'],
+    'max': stats['max'],
+    'missing': stats['missing'] or 0,
+    'count': stats['count'] or 0,
+    'maxBin': max(stats['hist'], default=0),
+    'hist': [dict(count=bin, x0=buckets[i], x1=buckets[i + 1]) for i, bin in enumerate(stats['hist'])],
+    'histGranularity': granularity
+  }
 
 
 def number_of_bins(length):
@@ -170,13 +207,25 @@ def to_boxplot_stats(c, stats, normalized_stats):
 
 
 def to_stats(cols, where = '', params = {}):
-  # compute all numbers at once
-  bins = number_of_bins(db_session.execute('select count(*) as c from rows').first()['c'])
+  dates = [c.dump for c in cols if c.type == 'date']
+
+  keys = ['count(*) as c']
+  for i, col in enumerate(dates):
+    keys.append('min({0}) as mind{1}'.format(col.column, i))
+    keys.append('max({0}) as maxd{1}'.format(col.column, i))
+  overall = db_session.execute('select {0} from rows'.format(', '.join(keys))).first()
+
+  bins = number_of_bins(overall['c'])
+  date_buckets = [to_date_buckets(overall['mind{0}'.format(i)], overall['maxd{0}'.format(i)]) for i in range(len(dates))]
+  print(date_buckets)
+
   def cats_of(c):
     categories = ['c1', 'c2', 'c3'] if c.column == 'cat' else ['a1', 'a2']
     return ', '.join('\'{0}\''.format(c) for c in categories)
 
   keys = []
+  date_index = 0
+
   for i, col in enumerate(cols):
     c = col.dump
     if col.type == 'number':
@@ -188,7 +237,9 @@ def to_stats(cols, where = '', params = {}):
     elif col.type == 'categorical':
       keys.append('cathist({c}, ARRAY[{cats}]) as cathist{i}'.format(c=c.column, cats=cats_of(c), i=i))
     elif col.type == 'date':
-      pass  # TODO
+      _, buckets = date_buckets[date_index]
+      date_index += 1
+      keys.append('datestats({c}, ARRAY[{bins}]) as dstats{i}'.format(c=c.column, bins=', '.join('date \'' + d.strftime('%Y-%m-%d') + '\'' for d in buckets[1:-1]), i=i))
 
   r = db_session.execute('select {0} from rows {1}'.format(', '.join(keys), where), params=params).first()
 
@@ -207,7 +258,9 @@ def to_stats(cols, where = '', params = {}):
       cathist = r['cathist{i}'.format(i=i)]
       stats.append(to_categorical_stats(c, cathist))
     elif col.type == 'date':
-      stats.append(None)
+      dstats = r['dstats{i}'.format(i=i)]
+      gran, buckets = date_buckets.pop(0)
+      stats.append(to_date_stats(c, dstats, gran, buckets))
 
   return stats
 

@@ -196,6 +196,77 @@ CREATE AGGREGATE cathist (val varchar, categories varchar[])
     initcond = '{}'
 );
 
+DROP TYPE IF EXISTS datestats_stype CASCADE;
+CREATE TYPE datestats_stype AS (hist integer[], missing integer, count integer, min date, max date);
+
+CREATE OR REPLACE FUNCTION datestats_sfunc(state datestats_stype, val date, bucket_ends date[])
+RETURNS datestats_stype
+AS $$
+DECLARE
+  nbuckets integer;
+  x date;
+  i integer;
+BEGIN
+  nbuckets := array_length(bucket_ends, 1) + 1;
+
+  -- Init the array with the correct number of 0's so the caller doesn't see NULLs
+  IF state.hist[0] IS NULL THEN
+    state.hist := array_fill(0, ARRAY[nbuckets], ARRAY[0]);
+  END IF;
+
+	IF val IS NULL THEN
+		state.missing := state.missing + 1;
+    RETURN state;
+	END IF;
+
+  state.count := state.count + 1;
+
+  IF state.max IS NULL OR val > state.max THEN
+    state.max := val;
+  END IF;
+  IF state.min IS NULL OR val < state.min THEN
+    state.min := val;
+  END IF;
+
+  i := 0;
+  FOREACH x IN ARRAY bucket_ends LOOP
+    IF val < x THEN
+      state.hist[i] := state.hist[i] + 1;
+      RETURN state;
+    END IF;
+    i := i + 1;
+  END LOOP;
+  -- add to last one
+  state.hist[i] := state.hist[i] + 1;
+
+	RETURN state;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION datestats_ffunc(state datestats_stype)
+RETURNS json
+AS $$
+BEGIN
+
+  RETURN json_build_object(
+    'min', state.min,
+    'max', state.max,
+    'count', state.count,
+    'missing', state.missing,
+    'hist', state.hist
+  );
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+
+DROP AGGREGATE IF EXISTS datestats (date, date[]);
+CREATE AGGREGATE datestats (val date, bucket_ends date[])
+(
+    sfunc = datestats_sfunc,
+    stype = datestats_stype,
+    initcond = '({},0,0,,)',
+    finalfunc = datestats_ffunc
+);
 
 -- MAPPING functions
 
