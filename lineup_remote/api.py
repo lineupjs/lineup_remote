@@ -174,7 +174,7 @@ def to_stats(cols, where = '', params = {}):
   bins = number_of_bins(db_session.execute('select count(*) as c from rows').first()['c'])
   def cats_of(c):
     categories = ['c1', 'c2', 'c3'] if c.column == 'cat' else ['a1', 'a2']
-    return '{\'' + ('\', \''.join(categories)) + '\'}'
+    return ', '.join('\'{0}\''.format(c) for c in categories)
 
   keys = []
   for i, col in enumerate(cols):
@@ -196,9 +196,9 @@ def to_stats(cols, where = '', params = {}):
   for i, col in enumerate(cols):
     c = col.dump
     if col.type == 'number':
-      stats = r['stats{i}'.format(i=i)]
+      sstats = r['stats{i}'.format(i=i)]
       nstats = r['nstats{i}'.format(i=i)]
-      stats.append(to_number_stats(c, stats, nstats))
+      stats.append(to_number_stats(c, sstats, nstats))
     elif col.type == 'boxplot':
       boxplot = r['boxplot{i}'.format(i=i)]
       nboxplot = r['nboxplot{i}'.format(i=i)]
@@ -208,6 +208,8 @@ def to_stats(cols, where = '', params = {}):
       stats.append(to_categorical_stats(c, cathist))
     elif col.type == 'date':
       stats.append(None)
+
+  return stats
 
 
 def post_stats(body):

@@ -131,7 +131,7 @@ class ComputeColumnDump():
 
 
 def parse_compute_column_dump(dump):
-  return ComputeColumnDump(parse_column_dump(dump['dump'], dump['type']))
+  return ComputeColumnDump(parse_column_dump(dump['dump']), dump['type'])
 
 
 class SortCriteria:

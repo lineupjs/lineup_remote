@@ -744,8 +744,8 @@ components:
         - dump
       properties:
         type:
-          type: enum
-          enums:
+          type: string
+          enum:
             - boxplot
             - categorical
             - date
