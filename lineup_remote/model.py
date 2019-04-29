@@ -124,6 +124,16 @@ def parse_column_dump(dump):
   return ColumnDump(dump, None, desc['type'])
 
 
+class ComputeColumnDump():
+  def __init__(self, dump, type):
+    self.dump = dump
+    self.type = type
+
+
+def parse_compute_column_dump(dump):
+  return ComputeColumnDump(parse_column_dump(dump['dump'], dump['type']))
+
+
 class SortCriteria:
   def __init__(self, dump):
     self.col = parse_column_dump(dump['col'])

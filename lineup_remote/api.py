@@ -1,6 +1,6 @@
 import logging
 from connexion import FlaskApp, NoContent
-from model import parse_column_dump, parse_ranking_dump
+from model import parse_column_dump, parse_ranking_dump, parse_compute_column_dump
 
 db_session = None
 
@@ -84,17 +84,22 @@ def post_sort(body):
 
 
 def to_categorical_stats(c, hist):
-  lookup = {row['cat']: dict(cat=row['cat'], color='gray', count=row['count']) for row in hist if row['cat'] is not None}
-  missing = next((row['count'] for row in hist if row['cat'] is None), 0)
-  count = sum((v['count'] for v in lookup.values()))
   categories = ['c1', 'c2', 'c3'] if c.column == 'cat' else ['a1', 'a2']  # TODO generalize
+
+  missing = hist[-1]
+  hist=[dict(cat=cat, color='gray', count=count) for cat, count in zip(categories, hist)]
+  count = sum((bin['count'] for bin in hist))
 
   return dict(
     missing=missing,
     count=count,
-    maxBin=max((v['count'] for v in lookup.values()), default=0),
-    hist=[lookup.get(c, dict(cat=c, color='gray', count=0)) for c in categories]
+    maxBin=max((bin['count'] for bin in hist), default=0),
+    hist=hist
   )
+
+def to_date_stats(c, stats):
+  # TODO
+  return None
 
 
 def number_of_bins(length):
@@ -132,6 +137,17 @@ def to_number_stats(c, stats, normalized_stats):
       'maxBin': max(stats['hist'], default=0),
       'hist': to_hist(stats['hist'], domain)
     }
+    return s
+
+  return {
+    'raw': to_stat(stats, c.map.domain),
+    'normalized': to_stat(normalized_stats, [0, 1])
+  }
+
+
+def to_boxplot_stats(c, stats, normalized_stats):
+
+  def to_stat(stats):
     boxplot = {
       'min': stats['min'],
       'q1': stats['q1'],
@@ -145,42 +161,57 @@ def to_number_stats(c, stats, normalized_stats):
       'missing': stats['missing'] or 0,
       'count': stats['count'] or 0,
     }
-    return s, boxplot
+    return boxplot
 
-  raw, raw_boxplot = to_stat(stats, c.map.domain)
-  normalized, normalized_boxplot = to_stat(normalized_stats, [0, 1])
   return {
-    'raw': raw,
-    'rawBoxPlot': raw_boxplot,
-    'normalized': normalized,
-    'normalizedBoxPlot': normalized_boxplot
+    'raw': to_stat(stats),
+    'normalized': to_stat(normalized_stats)
   }
 
 
 def to_stats(cols, where = '', params = {}):
-  numbers = [c for c in cols if c.type == 'number']
   # compute all numbers at once
-  if numbers:
-    # always on all data
-    bins = number_of_bins(db_session.execute('select count(*) as c from rows').first()['c'])
+  bins = number_of_bins(db_session.execute('select count(*) as c from rows').first()['c'])
+  def cats_of(c):
+    categories = ['c1', 'c2', 'c3'] if c.column == 'cat' else ['a1', 'a2']
+    return '{\'' + ('\', \''.join(categories)) + '\'}'
 
-    keys = ', '.join(['stats({c}, {bins}, {d[0]}, {d[1]}) as stats{i}, stats({n}, {bins}, 0, 1) as nstats{i}'.format(c=c.column, n=c.mapped_column, bins=bins, d=c.map.domain, i=i) for i, c in enumerate(numbers)])
-    r = db_session.execute('select {0} from rows {1}'.format(keys, where), params=params).first()
-    number_stats = [r['stats{0}'.format(i)] for i in range(len(numbers))]
-    number_nstats = [r['nstats{0}'.format(i)] for i in range(len(numbers))]
+  keys = []
+  for i, col in enumerate(cols):
+    c = col.dump
+    if col.type == 'number':
+      keys.append('stats({c}, {bins}, {d[0]}, {d[1]}) as stats{i}'.format(c=c.column, bins=bins, d=c.map.domain, i=i))
+      keys.append('stats({n}, {bins}, 0, 1) as nstats{i}'.format(n=c.mapped_column, bins=bins, i=i))
+    elif col.type == 'boxplot':
+      keys.append('boxplot({c}) as boxplot{i}'.format(c=c.column, i=i))
+      keys.append('boxplot({n}) as nboxplot{i}'.format(n=c.mapped_column, i=i))
+    elif col.type == 'categorical':
+      keys.append('cathist({c}, ARRAY[{cats}]) as cathist{i}'.format(c=c.column, cats=cats_of(c), i=i))
+    elif col.type == 'date':
+      pass  # TODO
 
-  def to_stat(c):
-    if c.type == 'categorical':
-      r = db_session.execute('select {0} as cat, count(*) as count from rows {1} group by {0}'.format(c.column, where), params=params)
-      return to_categorical_stats(c, r)
-    return None
-    # TODO support dates
+  r = db_session.execute('select {0} from rows {1}'.format(', '.join(keys), where), params=params).first()
 
-  return [to_number_stats(c, number_stats.pop(0), number_nstats.pop(0)) if c.type == 'number' else to_stat(c) for c in cols]
+  stats = []
+  for i, col in enumerate(cols):
+    c = col.dump
+    if col.type == 'number':
+      stats = r['stats{i}'.format(i=i)]
+      nstats = r['nstats{i}'.format(i=i)]
+      stats.append(to_number_stats(c, stats, nstats))
+    elif col.type == 'boxplot':
+      boxplot = r['boxplot{i}'.format(i=i)]
+      nboxplot = r['nboxplot{i}'.format(i=i)]
+      stats.append(to_boxplot_stats(c, boxplot, nboxplot))
+    elif col.type == 'categorical':
+      cathist = r['cathist{i}'.format(i=i)]
+      stats.append(to_categorical_stats(c, cathist))
+    elif col.type == 'date':
+      stats.append(None)
 
 
 def post_stats(body):
-  cols = [parse_column_dump(dump) for dump in body]
+  cols = [parse_compute_column_dump(dump) for dump in body]
   return to_stats(cols)
 
 
@@ -200,13 +231,13 @@ def get_column_search(column, query):
 
 
 def post_column_stats(column, body):
-  column_dump = parse_column_dump(body)
+  column_dump = parse_compute_column_dump(body)
   return to_stats([column_dump])[0]
 
 
 def post_ranking_column_stats(column, body):
   ranking_dump = parse_ranking_dump(body['ranking'])
-  column_dump = parse_column_dump(body['column'])
+  column_dump = parse_compute_column_dump(body['column'])
 
   where, args = ranking_dump.to_where()
   return to_stats([column_dump], where, args)[0]
@@ -214,7 +245,7 @@ def post_ranking_column_stats(column, body):
 
 def post_ranking_stats(body):
   ranking_dump = parse_ranking_dump(body['ranking'])
-  column_dumps = [parse_column_dump(r) for r in body['columns']]
+  column_dumps = [parse_compute_column_dump(r) for r in body['columns']]
 
   where, args = ranking_dump.to_where()
   return to_stats(column_dumps, where, args)
@@ -222,14 +253,14 @@ def post_ranking_stats(body):
 
 def post_ranking_group_stats(group, body):
   ranking_dump = parse_ranking_dump(body['ranking'])
-  column_dumps = [parse_column_dump(r) for r in body['columns']]
+  column_dumps = [parse_compute_column_dump(r) for r in body['columns']]
   where, args = ranking_dump.to_where(group)
   return to_stats(column_dumps, where, args)
 
 
 def post_ranking_group_column_stats(group, column, body):
   ranking_dump = parse_ranking_dump(body['ranking'])
-  column_dump = parse_column_dump(body['column'])
+  column_dump = parse_compute_column_dump(body['column'])
   where, args = ranking_dump.to_where(group)
   return to_stats([column_dump], where, args)[0]
 

@@ -1,6 +1,6 @@
 import 'file-loader?name=index.html!extract-loader!html-loader?interpolate!./index.html';
 import './style.scss';
-import {LineUp, RemoteDataProvider, IServerData, IOrderedGroup, IRemoteStatistics, IColumnDump, IServerRankingDump} from 'lineupjs';
+import {LineUp, RemoteDataProvider, IServerData, IOrderedGroup, IRemoteStatistics, IColumnDump, IServerRankingDump, IComputeColumn} from 'lineupjs';
 
 interface IRow {
   d: string;
@@ -49,15 +49,15 @@ class Server implements IServerData {
     return fetch(`/api/column/${column.id}/?query=${encodeURIComponent(search.toString())}`).then((r) => r.json());
   }
 
-  computeDataStats(columns: IColumnDump[]): Promise<IRemoteStatistics[]> {
+  computeDataStats(columns: IComputeColumn[]): Promise<IRemoteStatistics[]> {
     return this.post(`/api/stats`, columns);
   }
 
-  computeRankingStats(ranking: IServerRankingDump, columns: IColumnDump[]): Promise<IRemoteStatistics[]> {
+  computeRankingStats(ranking: IServerRankingDump, columns: IComputeColumn[]): Promise<IRemoteStatistics[]> {
     return this.post(`/api/ranking/stats`, {ranking, columns});
   }
 
-  computeGroupStats(ranking: IServerRankingDump, group: string, columns: IColumnDump[]): Promise<IRemoteStatistics[]> {
+  computeGroupStats(ranking: IServerRankingDump, group: string, columns: IComputeColumn[]): Promise<IRemoteStatistics[]> {
     return this.post(`/api/ranking/group/${group}/stats`, {ranking, columns});
   }
 }

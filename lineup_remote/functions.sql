@@ -2,7 +2,7 @@
 -- stats aggregation function
 
 DROP TYPE IF EXISTS stats_stype CASCADE;
-CREATE TYPE stats_stype AS (values double precision[], hist integer[], missing integer);
+CREATE TYPE stats_stype AS (hist integer[], missing integer, count integer, min double precision, max double precision, sum double precision);
 
 CREATE OR REPLACE FUNCTION stats_sfunc(state stats_stype, val double precision, nbuckets integer, min_hist double precision, max_hist double precision)
 RETURNS stats_stype
@@ -18,24 +18,80 @@ BEGIN
 
 	IF val IS NULL THEN
 		state.missing := state.missing + 1;
-	ELSE
-		state.values := array_append(state.values, val);
-		-- This will put values in buckets with a 0 bucket for <MIN and a (nbuckets+1) bucket for >=MAX
-    bucket := width_bucket(val, min_hist, max_hist, nbuckets) - 1;
-    IF bucket < 0 THEN
-      bucket := 0;
-    ELSE IF bucket > nbuckets THEN
-      bucket := nbuckets;
-    END IF;
-    END IF;
-
-    state.hist[bucket] := state.hist[bucket] + 1;
+    RETURN state;
 	END IF;
+
+  state.count := state.count + 1;
+  state.sum := state.sum + val;
+
+  IF state.max IS NULL OR val > state.max THEN
+    state.max := val;
+  END IF;
+  IF state.min IS NULL OR val < state.min THEN
+    state.min := val;
+  END IF;
+
+  -- This will put values in buckets with a 0 bucket for <MIN and a (nbuckets+1) bucket for >=MAX
+  bucket := width_bucket(val, min_hist, max_hist, nbuckets) - 1;
+  IF bucket < 0 THEN
+    bucket := 0;
+  ELSE IF bucket > nbuckets THEN
+    bucket := nbuckets;
+  END IF;
+  END IF;
+
+  state.hist[bucket] := state.hist[bucket] + 1;
+
 	RETURN state;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION stats_ffunc(state stats_stype)
+RETURNS json
+AS $$
+DECLARE
+  mean double precision;
+BEGIN
+
+  RETURN json_build_object(
+    'min', state.min,
+    'max', state.max,
+    'mean', state.sum / state.count,
+    'count', state.count,
+    'missing', state.missing,
+    'hist', state.hist
+  );
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+
+DROP AGGREGATE IF EXISTS stats (double precision, integer, double precision, double precision);
+CREATE AGGREGATE stats (val double precision, nbuckets integer, min_hist double precision, max_hist double precision)
+(
+    sfunc = stats_sfunc,
+    stype = stats_stype,
+    initcond = '({},0,0,,,0)',
+    finalfunc = stats_ffunc
+);
+
+
+DROP TYPE IF EXISTS boxplot_stype CASCADE;
+CREATE TYPE boxplot_stype AS (values double precision[], missing integer);
+
+CREATE OR REPLACE FUNCTION boxplot_sfunc(state boxplot_stype, val double precision)
+RETURNS boxplot_stype
+AS $$
+BEGIN
+	IF val IS NULL THEN
+		state.missing := state.missing + 1;
+	ELSE
+		state.values := array_append(state.values, val);
+	END IF;
+	RETURN state;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION boxplot_ffunc(state boxplot_stype)
 RETURNS json
 AS $$
 DECLARE
@@ -81,62 +137,63 @@ BEGIN
     'whiskerHigh', upper_whisker,
     'mean', mean,
     'count', array_length(arr, 1),
-    'missing', state.missing,
-    'hist', state.hist
+    'missing', state.missing
   );
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 
-DROP AGGREGATE IF EXISTS stats (double precision, integer, double precision, double precision);
-CREATE AGGREGATE stats (val double precision, nbuckets integer, min_hist double precision, max_hist double precision)
+DROP AGGREGATE IF EXISTS boxplot (double precision);
+CREATE AGGREGATE boxplot (val double precision)
 (
-    sfunc = stats_sfunc,
-    stype = stats_stype,
-    initcond = '({},{},0)',
-    finalfunc = stats_ffunc
+    sfunc = boxplot_sfunc,
+    stype = boxplot_stype,
+    initcond = '({},0)',
+    finalfunc = boxplot_ffunc
 );
 
--- https://wiki.postgresql.org/wiki/Aggregate_Histogram
--- HISTOGRAM
 
-CREATE OR REPLACE FUNCTION histogram_sfunc(state integer[], val double precision, min_value double precision, max_value double precision, nbuckets integer)
+CREATE OR REPLACE FUNCTION cathist_sfunc(state integer[], val varchar, categories varchar[])
 RETURNS integer[]
 AS $$
 DECLARE
-  bucket integer;
+  len integer;
   i integer;
+  x varchar;
 BEGIN
-  -- do nothing if val is NULL
-  IF val IS NULL THEN
-     RETURN state;
-  END IF;
-
-  -- This will put values in buckets with a 0 bucket for <MIN and a (nbuckets+1) bucket for >=MAX
-  bucket := width_bucket(val, min_value, max_value, nbuckets) - 1;
-  IF bucket < 0 THEN
-    bucket := 0;
-  ELSE IF bucket > nbuckets THEN
-    bucket := nbuckets;
-  END IF;
-  END IF;
-
+  len := array_length(categories, 1);
   -- Init the array with the correct number of 0's so the caller doesn't see NULLs
   IF state[0] IS NULL THEN
-    state := array_fill(0, ARRAY[nbuckets], ARRAY[0]);
+    state := array_fill(0, ARRAY[len + 1], ARRAY[0]);
   END IF;
 
-  state[bucket] := state[bucket] + 1;
+  IF val IS NULL THEN
+    state[len] := state[len] + 1;
+    RETURN state;
+	END IF;
 
-  RETURN state;
+  i := 0;
+
+  FOREACH x IN ARRAY categories LOOP
+    IF x = val THEN
+      state[i] := state[i] + 1;
+      RETURN state;
+    END IF;
+    i := i + 1;
+  END LOOP;
+
+  state[len] := state[len] + 1; -- count as missing
+	RETURN state;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
-DROP AGGREGATE IF EXISTS histogram (double precision, double precision, double precision, integer);
-CREATE AGGREGATE histogram (val double precision, min_value double precision, max_value double precision, nbuckets integer) (
-       SFUNC = histogram_sfunc,
-       STYPE = INTEGER[],
-       PARALLEL = SAFE -- Remove line for compatibility with  Postgresql < 9.6
+
+DROP AGGREGATE IF EXISTS cathist (varchar, categories varchar[]);
+CREATE AGGREGATE cathist (val varchar, categories varchar[])
+(
+    sfunc = cathist_sfunc,
+    stype = integer[],
+    initcond = '{}'
 );
 
 

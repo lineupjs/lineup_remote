@@ -109,7 +109,7 @@ paths:
             schema:
               type: array
               items:
-                $ref: '#/components/schemas/RemoteColumnDump'
+                $ref: '#/components/schemas/ComputeAbleColumn'
       responses:
         '200':
           description: return stats
@@ -144,7 +144,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RemoteColumnDump'
+              $ref: '#/components/schemas/ComputeAbleColumn'
       responses:
         '200':
           description: return stats
@@ -553,27 +553,32 @@ components:
         count:
           type: integer
           format: int32
-    MultiNumberStatistics:
+    RawNormalizedStatistics:
       type: object
       required:
         - raw
-        - rawBoxPlot
         - normalized
-        - normalizedBoxPlot
       properties:
         raw:
           $ref: '#/components/schemas/Statistics'
-        rawBoxPlot:
-          $ref: '#/components/schemas/AdvancedBoxPlotData'
         normalized:
           $ref: '#/components/schemas/Statistics'
-        normalizedBoxPlot:
+    RawNormalizedAdvancedBoxPlotData:
+      type: object
+      required:
+        - raw
+        - normalized
+      properties:
+        raw:
+          $ref: '#/components/schemas/AdvancedBoxPlotData'
+        normalized:
           $ref: '#/components/schemas/AdvancedBoxPlotData'
     RemoteStatistics:
       oneOf:
         - $ref: '#/components/schemas/DateStatistics'
         - $ref: '#/components/schemas/CategoricalStatistics'
-        - $ref: '#/components/schemas/MultiNumberStatistics'
+        - $ref: '#/components/schemas/RawNormalizedStatistics'
+        - $ref: '#/components/schemas/RawNormalizedAdvancedBoxPlotData'
     ColumnDump:
       type: object
       required:
@@ -732,6 +737,21 @@ components:
         #- $ref: '#/components/schemas/StringColumnDump'
         - type: object
           additionalProperties: true
+    ComputeAbleColumn:
+      type: object
+      required:
+        - type
+        - dump
+      properties:
+        type:
+          type: enum
+          enums:
+            - boxplot
+            - categorical
+            - date
+            - number
+        dump:
+          $ref: '#/components/schemas/RemoteColumnDump'
     ServerRankingDump:
       type: object
       required:
@@ -781,7 +801,7 @@ components:
         ranking:
           $ref: '#/components/schemas/ServerRankingDump'
         column:
-          $ref: '#/components/schemas/RemoteColumnDump'
+          $ref: '#/components/schemas/ComputeAbleColumn'
     RemoteRankingColumnsDump:
       type: object
       required:
@@ -793,5 +813,5 @@ components:
         columns:
           type: array
           items:
-            $ref: '#/components/schemas/RemoteColumnDump'
+            $ref: '#/components/schemas/ComputeAbleColumn'
 
