@@ -56,7 +56,7 @@ BEGIN
   RETURN json_build_object(
     'min', state.min,
     'max', state.max,
-    'mean', state.sum / state.count,
+    'mean', CASE WHEN state.count = 0 THEN NULL ELSE state.sum / state.count END,
     'count', state.count,
     'missing', state.missing,
     'hist', state.hist
