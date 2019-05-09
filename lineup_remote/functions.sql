@@ -75,23 +75,7 @@ CREATE AGGREGATE stats (val double precision, nbuckets integer, min_hist double 
 );
 
 
-DROP TYPE IF EXISTS boxplot_stype CASCADE;
-CREATE TYPE boxplot_stype AS (values double precision[], missing integer);
-
-CREATE OR REPLACE FUNCTION boxplot_sfunc(state boxplot_stype, val double precision)
-RETURNS boxplot_stype
-AS $$
-BEGIN
-	IF val IS NULL THEN
-		state.missing := state.missing + 1;
-	ELSE
-		state.values := array_append(state.values, val);
-	END IF;
-	RETURN state;
-END;
-$$ LANGUAGE plpgsql IMMUTABLE;
-
-CREATE OR REPLACE FUNCTION boxplot_ffunc(state boxplot_stype)
+CREATE OR REPLACE FUNCTION boxplot_ffunc(arr double precision[])
 RETURNS json
 AS $$
 DECLARE
@@ -105,13 +89,14 @@ DECLARE
   min_whisker double precision;
   outliers double precision[];
   mean double precision;
-  arr double precision[];
+  missing integer;
 BEGIN
-  arr := state.values;
 
   SELECT
-    percentile_cont(ARRAY[0, 0.25, 0.5, 0.75, 1]) WITHIN GROUP (ORDER BY v ASC), avg(v)
-  INTO percentiles, mean
+    percentile_cont(ARRAY[0, 0.25, 0.5, 0.75, 1]) WITHIN GROUP (ORDER BY v ASC),
+    avg(v),
+    sum(CASE WHEN v is null THEN 1 ELSE 0 END)
+  INTO percentiles, mean, missing
   FROM unnest(arr) AS t(v);
 
   q1 := percentiles[2];
@@ -136,8 +121,8 @@ BEGIN
     'whiskerLow', lower_whisker,
     'whiskerHigh', upper_whisker,
     'mean', mean,
-    'count', array_length(arr, 1),
-    'missing', state.missing
+    'count', array_length(arr, 1) - missing,
+    'missing', missing
   );
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
@@ -146,9 +131,9 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 DROP AGGREGATE IF EXISTS boxplot (double precision);
 CREATE AGGREGATE boxplot (val double precision)
 (
-    sfunc = boxplot_sfunc,
-    stype = boxplot_stype,
-    initcond = '({},0)',
+    sfunc = array_append,
+    stype = double precision[],
+    initcond = '{}',
     finalfunc = boxplot_ffunc
 );
 
