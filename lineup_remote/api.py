@@ -11,30 +11,36 @@ def _init_db(uri):
   return scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 
 
+TABLE = 'rows'
+
+
 def to_dict(result):
   columns = result.keys()
   return [{c: r[c] for c in columns} for r in result]
 
+
+def categories_of(column):
+  return ['c1', 'c2', 'c3'] if column == 'cat' else ['a1', 'a2']  # TODO generalize
 
 def get_desc():
   # TODO derive from DB
   return [
     dict(label='D', type='string', column='d'),
     dict(label='A', type='number', column='a', domain=[0, 1]),
-    dict(label='Cat', type='categorical', column='cat', categories=['c1', 'c2', 'c3']),
-    dict(label='Cat Label', type='categorical', column='cat2', categories=['a1', 'a2']),
-    dict(label='Date', type='date', column='dd'),
+    dict(label='Cat', type='categorical', column='cat', categories=categories_of('cat')),
+    dict(label='Cat Label', type='categorical', column='cat2', categories=categories_of('cat2')),
+    dict(label='Date', type='date', column='dd', dateFormat='%Y-%m-%d'),
   ]
 
 
 def get_count():
-  return db_session.scalar('select count(*) as c from rows')
+  return db_session.scalar('select count(*) as c from {t}'.format(t=TABLE))
 
 
 def get_rows(ids=None):
   if not ids:
-    return to_dict(db_session.execute('select * from rows'))
-  lookup = {r['id']: r for r in to_dict(db_session.execute('select * from rows where id = any(:ids)', params=dict(ids=ids)))}
+    return to_dict(db_session.execute('select * from {t}'.format(t=TABLE)))
+  lookup = {r['id']: r for r in to_dict(db_session.execute('select * from {t} where id = any(:ids)'.format(t=TABLE), params=dict(ids=ids)))}
   # ensure incoming order
   return [lookup.get(id) for id in ids]
 
@@ -44,7 +50,7 @@ def post_rows(body):
 
 
 def get_row(row_id):
-  r = db_session.execute('select * from rows where id = :row_id', params=dict(row_id=row_id))
+  r = db_session.execute('select * from {t} where id = :row_id'.format(t=TABLE), params=dict(row_id=row_id))
   r = to_dict(r)
   if not r:
     return NoContent, 404
@@ -58,7 +64,7 @@ def post_sort(body):
   order_by = ranking_dump.to_sort()
 
   if not ranking_dump.group_criteria:
-    query = 'select id from rows {0} {1}'.format(where, order_by)
+    query = 'select id from {2} {0} {1}'.format(where, order_by, TABLE)
     r = db_session.execute(query, params=args)
 
     ids = [row['id'] for row in r]
@@ -70,7 +76,7 @@ def post_sort(body):
       }
     ]
   else:
-    query = 'select {2} as name, array_agg(id) as ids from rows {0} {1} group by {3}'.format(where, order_by, ranking_dump.to_group_name(), ', '.join(c.column for c in ranking_dump.group_criteria))
+    query = 'select {2} as name, array_agg(id) as ids from {4} {0} {1} group by {3}'.format(where, order_by, ranking_dump.to_group_name(), ', '.join(c.column for c in ranking_dump.group_criteria), TABLE)
     r = db_session.execute(query, params=args)
 
     groups = [{
@@ -85,7 +91,7 @@ def post_sort(body):
 
 
 def to_categorical_stats(c, hist):
-  categories = ['c1', 'c2', 'c3'] if c.column == 'cat' else ['a1', 'a2']  # TODO generalize
+  categories = categories_of(c.column)
 
   missing = hist[-1]
   hist=[dict(cat=cat, color='gray', count=count) for cat, count in zip(categories, hist)]
@@ -213,14 +219,14 @@ def to_stats(cols, where = '', params = {}):
   for i, col in enumerate(dates):
     keys.append('min({0}) as mind{1}'.format(col.column, i))
     keys.append('max({0}) as maxd{1}'.format(col.column, i))
-  overall = db_session.execute('select {0} from rows'.format(', '.join(keys))).first()
+  overall = db_session.execute('select {0} from {1}'.format(', '.join(keys), TABLE)).first()
 
   bins = number_of_bins(overall['c'])
   date_buckets = [to_date_buckets(overall['mind{0}'.format(i)], overall['maxd{0}'.format(i)]) for i in range(len(dates))]
   print(date_buckets)
 
   def cats_of(c):
-    categories = ['c1', 'c2', 'c3'] if c.column == 'cat' else ['a1', 'a2']
+    categories = categories_of(c.column)
     return ', '.join('\'{0}\''.format(c) for c in categories)
 
   keys = []
@@ -241,7 +247,7 @@ def to_stats(cols, where = '', params = {}):
       date_index += 1
       keys.append('datestats({c}, ARRAY[{bins}]) as dstats{i}'.format(c=c.column, bins=', '.join('date \'' + d.strftime('%Y-%m-%d') + '\'' for d in buckets[1:-1]), i=i))
 
-  r = db_session.execute('select {0} from rows {1}'.format(', '.join(keys), where), params=params).first()
+  r = db_session.execute('select {0} from {2} {1}'.format(', '.join(keys), where, TABLE), params=params).first()
 
   stats = []
   for i, col in enumerate(cols):
@@ -276,12 +282,12 @@ def get_column_stats(column):
 
 
 def get_column_mapping_sample(column):
-  r = db_session.execute('select id from rows limit 100')
+  r = db_session.execute('select id from {t} limit 100'.format(t=TABLE))
   return [row['id'] for row in r]
 
 
 def get_column_search(column, query):
-  r = db_session.execute('select id from rows where {} = :query'.format(column), params=dict(query=query))
+  r = db_session.execute('select id from {t} where {c} = :query'.format(c=column, t=TABLE), params=dict(query=query))
   return [row['id'] for row in r]
 
 
@@ -342,4 +348,3 @@ def get_public(path):
 @app.app.teardown_appcontext
 def shutdown_session(exception=None):
   db_session.remove()
-
