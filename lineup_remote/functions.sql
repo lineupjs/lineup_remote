@@ -46,6 +46,41 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
+CREATE OR REPLACE FUNCTION stats_sinvfunc(state stats_stype, val double precision, nbuckets integer, min_hist double precision, max_hist double precision)
+RETURNS stats_stype
+AS $$
+DECLARE
+  bucket integer;
+  i integer;
+BEGIN
+  IF val IS NULL THEN
+		state.missing := state.missing - 1;
+    RETURN state;
+	END IF;
+
+  state.count := state.count - 1;
+  state.sum := state.sum - val;
+
+  IF val = state.max OR val = state.min THEN
+    RETURN null; -- cannot find the last min or lats max
+  END IF;
+
+  -- This will put values in buckets with a 0 bucket for <MIN and a (nbuckets+1) bucket for >=MAX
+  bucket := width_bucket(val, min_hist, max_hist, nbuckets) - 1;
+  IF bucket < 0 THEN
+    bucket := 0;
+  ELSE IF bucket > nbuckets THEN
+    bucket := nbuckets;
+  END IF;
+  END IF;
+
+  state.hist[bucket] := state.hist[bucket] - 1;
+
+	RETURN state;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+
 CREATE OR REPLACE FUNCTION stats_ffunc(state stats_stype)
 RETURNS json
 AS $$
@@ -64,14 +99,37 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
+CREATE OR REPLACE FUNCTION stats_combinefunc(a stats_stype, b stats_stype)
+RETURNS stats_stype
+AS $$
+DECLARE
+  ret stats_stype;
+BEGIN
+  ret.hist = intarray_merge(a.hist, b.hist);
+  ret.missing = a.missing + b.missing;
+  ret.count = a.count + b.count;
+  ret.min = CASE WHEN a.min < b.min THEN a ELSE b END;
+  ret.max = CASE WHEN a.max > b.max THEN a ELSE b END;
+  ret.sum = a.sum + b.sum;
+  RETURN ret;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
 
 DROP AGGREGATE IF EXISTS stats (double precision, integer, double precision, double precision);
 CREATE AGGREGATE stats (val double precision, nbuckets integer, min_hist double precision, max_hist double precision)
 (
     sfunc = stats_sfunc,
     stype = stats_stype,
+    combinefunc = stats_combinefunc,
     initcond = '({},0,0,,,0)',
-    finalfunc = stats_ffunc
+    finalfunc = stats_ffunc,
+    msfunc = stats_sfunc,
+    minvfunc = stats_sinvfunc,
+    mstype = stats_stype,
+    minitcond = '({},0,0,,,0)',
+    mfinalfunc = stats_ffunc,
+    PARALLEL = SAFE
 );
 
 
@@ -133,8 +191,10 @@ CREATE AGGREGATE boxplot (val double precision)
 (
     sfunc = array_append,
     stype = double precision[],
+    combinefunc = array_cat,
     initcond = '{}',
-    finalfunc = boxplot_ffunc
+    finalfunc = boxplot_ffunc,
+    PARALLEL = SAFE
 );
 
 
@@ -172,13 +232,33 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
+CREATE OR REPLACE FUNCTION intarray_merge(a integer[], b integer[])
+RETURNS integer[]
+AS $$
+DECLARE
+  len integer;
+  i integer;
+  ret integer[];
+BEGIN
+  len := array_length(a, 1);
+
+  FOR i in 1..len LOOP
+    ret[i] = a[i] + b[i];
+  END LOOP;
+
+  RETURN ret;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
 
 DROP AGGREGATE IF EXISTS cathist (varchar, categories varchar[]);
 CREATE AGGREGATE cathist (val varchar, categories varchar[])
 (
     sfunc = cathist_sfunc,
     stype = integer[],
-    initcond = '{}'
+    combinefunc = intarray_merge,
+    initcond = '{}',
+    PARALLEL = SAFE
 );
 
 DROP TYPE IF EXISTS datestats_stype CASCADE;
@@ -228,6 +308,44 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
+
+CREATE OR REPLACE FUNCTION datestats_sinvfunc(state datestats_stype, val date, bucket_ends date[])
+RETURNS datestats_stype
+AS $$
+DECLARE
+  nbuckets integer;
+  x date;
+  i integer;
+BEGIN
+  nbuckets := array_length(bucket_ends, 1) + 1;
+
+  IF val IS NULL THEN
+		state.missing := state.missing - 1;
+    RETURN state;
+	END IF;
+
+  state.count := state.count - 1;
+
+  IF state.max = val OR state.min = val THEN
+    RETURN NULL;
+  END IF;
+
+  i := 0;
+  FOREACH x IN ARRAY bucket_ends LOOP
+    IF val < x THEN
+      state.hist[i] := state.hist[i] - 1;
+      RETURN state;
+    END IF;
+    i := i + 1;
+  END LOOP;
+  -- add to last one
+  state.hist[i] := state.hist[i] - 1;
+
+	RETURN state;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+
 CREATE OR REPLACE FUNCTION datestats_ffunc(state datestats_stype)
 RETURNS json
 AS $$
@@ -244,13 +362,36 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 
+CREATE OR REPLACE FUNCTION datestats_combinefunc(a datestats_stype, b datestats_stype)
+RETURNS datestats_stype
+AS $$
+DECLARE
+  ret datestats_stype;
+BEGIN
+  ret.hist = intarray_merge(a.hist, b.hist);
+  ret.missing = a.missing + b.missing;
+  ret.count = a.count + b.count;
+  ret.min = CASE WHEN a.min < b.min THEN a ELSE b END;
+  ret.max = CASE WHEN a.max > b.max THEN a ELSE b END;
+  RETURN ret;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+
 DROP AGGREGATE IF EXISTS datestats (date, date[]);
 CREATE AGGREGATE datestats (val date, bucket_ends date[])
 (
     sfunc = datestats_sfunc,
     stype = datestats_stype,
+    combinefunc = datestats_combinefunc,
     initcond = '({},0,0,,)',
-    finalfunc = datestats_ffunc
+    finalfunc = datestats_ffunc,
+    msfunc = datestats_sfunc,
+    minvfunc = datestats_sinvfunc,
+    mstype = datestats_stype,
+    minitcond = '({},0,0,,)',
+    mfinalfunc = datestats_ffunc,
+    PARALLEL = SAFE
 );
 
 -- MAPPING functions
