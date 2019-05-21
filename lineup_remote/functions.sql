@@ -4,6 +4,7 @@
 DROP TYPE IF EXISTS stats_stype CASCADE;
 CREATE TYPE stats_stype AS (hist integer[], missing integer, count integer, min double precision, max double precision, sum double precision);
 
+-- incremental aggregation for computing numerical stats
 CREATE OR REPLACE FUNCTION stats_sfunc(state stats_stype, val double precision, nbuckets integer, min_hist double precision, max_hist double precision)
 RETURNS stats_stype
 AS $$
@@ -11,7 +12,7 @@ DECLARE
   bucket integer;
   i integer;
 BEGIN
-  -- Init the array with the correct number of 0's so the caller doesn't see NULLs
+  -- init the array with the correct number of 0's so the caller doesn't see NULLs
   IF state.hist[0] IS NULL THEN
     state.hist := array_fill(0, ARRAY[nbuckets], ARRAY[0]);
   END IF;
@@ -33,6 +34,7 @@ BEGIN
 
   -- This will put values in buckets with a 0 bucket for <MIN and a (nbuckets+1) bucket for >=MAX
   bucket := width_bucket(val, min_hist, max_hist, nbuckets) - 1;
+  -- clamp bucket
   IF bucket < 0 THEN
     bucket := 0;
   ELSE IF bucket > nbuckets THEN
@@ -46,6 +48,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
+-- inverse function of stats_sfunc trying to undo adding the given value
 CREATE OR REPLACE FUNCTION stats_sinvfunc(state stats_stype, val double precision, nbuckets integer, min_hist double precision, max_hist double precision)
 RETURNS stats_stype
 AS $$
@@ -62,7 +65,7 @@ BEGIN
   state.sum := state.sum - val;
 
   IF val = state.max OR val = state.min THEN
-    RETURN null; -- cannot find the last min or lats max
+    RETURN null; -- cannot find the last min or last max thus cannot undo
   END IF;
 
   -- This will put values in buckets with a 0 bucket for <MIN and a (nbuckets+1) bucket for >=MAX
@@ -87,7 +90,7 @@ AS $$
 DECLARE
   mean double precision;
 BEGIN
-
+  -- create a json object out of it
   RETURN json_build_object(
     'min', state.min,
     'max', state.max,
@@ -99,6 +102,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
+-- merge two stats objects together
 CREATE OR REPLACE FUNCTION stats_combinefunc(a stats_stype, b stats_stype)
 RETURNS stats_stype
 AS $$
@@ -115,7 +119,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
-
+-- computes numerical statistics for a given double precision column
+-- requires the number of buckets and the histogram borders (min_hist, max_hist) as input
 DROP AGGREGATE IF EXISTS stats (double precision, integer, double precision, double precision);
 CREATE AGGREGATE stats (val double precision, nbuckets integer, min_hist double precision, max_hist double precision)
 (
@@ -132,7 +137,7 @@ CREATE AGGREGATE stats (val double precision, nbuckets integer, min_hist double 
     PARALLEL = SAFE
 );
 
-
+-- computes the boxplot statistics given for the given array
 CREATE OR REPLACE FUNCTION boxplot_ffunc(arr double precision[])
 RETURNS json
 AS $$
@@ -197,7 +202,7 @@ CREATE AGGREGATE boxplot (val double precision)
     PARALLEL = SAFE
 );
 
-
+-- similar to numerical but for categorical data, requires a list of categories
 CREATE OR REPLACE FUNCTION cathist_sfunc(state integer[], val varchar, categories varchar[])
 RETURNS integer[]
 AS $$
@@ -232,6 +237,37 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
+CREATE OR REPLACE FUNCTION cathist_sinvfunc(state integer[], val varchar, categories varchar[])
+RETURNS integer[]
+AS $$
+DECLARE
+  len integer;
+  i integer;
+  x varchar;
+BEGIN
+  len := array_length(categories, 1);
+
+  IF val IS NULL THEN
+    state[len] := state[len] - 1;
+    RETURN state;
+	END IF;
+
+  i := 0;
+
+  FOREACH x IN ARRAY categories LOOP
+    IF x = val THEN
+      state[i] := state[i] - 1;
+      RETURN state;
+    END IF;
+    i := i + 1;
+  END LOOP;
+
+  state[len] := state[len] - 1; -- count as missing
+	RETURN state;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+-- merges two integer arrays by adding them up, e.g. to combine two histograms
 CREATE OR REPLACE FUNCTION intarray_merge(a integer[], b integer[])
 RETURNS integer[]
 AS $$
@@ -258,6 +294,10 @@ CREATE AGGREGATE cathist (val varchar, categories varchar[])
     stype = integer[],
     combinefunc = intarray_merge,
     initcond = '{}',
+    msfunc = cathist_sfunc,
+    minvfunc = cathist_sinvfunc,
+    mstype = integer[],
+    minitcond = '{}',
     PARALLEL = SAFE
 );
 
