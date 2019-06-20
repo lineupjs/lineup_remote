@@ -108,6 +108,24 @@ class StringColumnDump(ColumnDump):
     self.group_criteria = dump.get('groupCriteria')
 
 
+class CompositeColumnDump(ColumnDump):
+  def __init__(self, dump, type):
+    super(CompositeColumnDump, self).__init__(dump, None, dump['desc']['type'])
+    self.children = parse_column_dump(c for c in dump.get('children', []))
+
+
+class StackColumnDump(CompositeColumnDump):
+  def __init__(self, dump):
+    super(StackColumnDump, self).__init__(dump)
+    self.total = dump['width']
+
+
+class NestedColumnDump(CompositeColumnDump):
+  def __init__(self, dump):
+    super(NestedColumnDump, self).__init__(dump)
+
+
+
 def parse_column_dump(dump):
   desc = dump['desc']
   if isinstance(desc, str):
@@ -121,6 +139,12 @@ def parse_column_dump(dump):
     if column_type == 'date':
       return DateColumnDump(dump, column)
     return ColumnDump(dump, column, column_type)
+  # object dump so a composite for example
+  column_type = desc.get('type')
+  if column_type == 'stack':
+    return StackColumnDump(dump)
+  elif column_type == 'nested':
+    return NestedColumnDump(dump)
   return ColumnDump(dump, None, desc['type'])
 
 
@@ -151,6 +175,9 @@ class ServerRankingDump:
     self.sort_criteria = [SortCriteria(d) for d in dump.get('sortCriteria', [])]
     self.group_criteria = [parse_column_dump(d) for d in dump.get('groupCriteria', [])]
     self.group_sort_criteria = [SortCriteria(d) for d in dump.get('groupSortCriteria', [])]
+
+    # TODO support nested columns, support boolean columns
+    # TODO support stacked columns
 
   def to_filter(self):
     fs = [f.to_filter() for f in self.filter if f.filter]
