@@ -1,13 +1,14 @@
 import re
+from typing import Any, Dict, Tuple
 
 class NumberFilter:
-  def __init__(self, dump):
+  def __init__(self, dump: Dict[str,Any]):
     self.min = dump['min']
     self.max = dump['max']
     self.filter_missing = dump['filterMissing']
 
-  def to_sql(self, column):
-    args = dict()
+  def to_sql(self, column: str) -> Tuple[str, Dict[str,float]]:
+    args = {}
     if self.min is not None and self.max is not None:
       sql = '{0} between :{0}_min and :{0}_max'
       args[column + '_min'] = self.min
@@ -58,7 +59,7 @@ class StringFilter:
 
   def to_sql(self, column):
     if self.filter == '__FILTER_MISSING':
-      return '({0} is not null AND {0} != ""'.format(column), dict()
+      return '({0} is not null AND {0} != ""'.format(column), {}
 
     if self.filter.startswith('REGEX:'):
       return '{0} ~ {0}'.format(column), {column: self.filter[6:]}

@@ -1,4 +1,4 @@
 
-from api import app
+from .api import app
 
 app.run(port=8080, debug=True)

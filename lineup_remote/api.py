@@ -1,12 +1,14 @@
 import logging
 from connexion import FlaskApp, NoContent
-from model import parse_column_dump, parse_ranking_dump, parse_compute_column_dump
+from sqlalchemy.orm import scoped_session
+from typing import Any, Dict, List
+from .model import parse_column_dump, parse_ranking_dump, parse_compute_column_dump
 
-db_session = None
+db_session: scoped_session = None
 
-def _init_db(uri):
+def _init_db(uri: str) -> scoped_session:
   from sqlalchemy import create_engine
-  from sqlalchemy.orm import scoped_session, sessionmaker
+  from sqlalchemy.orm import sessionmaker
   engine = create_engine(uri, convert_unicode=True, echo=True)
   return scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 
@@ -14,15 +16,15 @@ def _init_db(uri):
 TABLE = 'rows'
 
 
-def to_dict(result):
+def to_dict(result) -> List[Dict[str, Any]]:
   columns = result.keys()
   return [{c: r[c] for c in columns} for r in result]
 
 
-def categories_of(column):
+def categories_of(column: str):
   return ['c1', 'c2', 'c3'] if column == 'cat' else ['a1', 'a2']  # TODO generalize
 
-def get_desc():
+def get_desc() -> List[Dict[str, Any]]:
   # TODO derive from DB
   return [
     dict(label='D', type='string', column='d'),
@@ -33,16 +35,16 @@ def get_desc():
   ]
 
 
-def get_count():
+def get_count() -> int:
   return db_session.scalar('select count(*) as c from {t}'.format(t=TABLE))
 
 
-def get_rows(ids=None):
+def get_rows(ids=None) -> List[Dict[str, Any]]:
   if not ids:
     return to_dict(db_session.execute('select * from {t}'.format(t=TABLE)))
   lookup = {r['id']: r for r in to_dict(db_session.execute('select * from {t} where id = any(:ids)'.format(t=TABLE), params=dict(ids=ids)))}
   # ensure incoming order
-  return [lookup.get(id) for id in ids]
+  return [lookup.get(id, {}) for id in ids]
 
 
 def post_rows(body):

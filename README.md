@@ -7,7 +7,7 @@ LineUp Remote
 Authors
 -------
 
- * Samuel Gratzl (@sgratzl)
+ * Samuel Gratzl ([@sgratzl](https://github.com/sgratzl))
 
 [mit-image]: https://img.shields.io/badge/License-MIT-yellow.svg
 [mit-url]: https://opensource.org/licenses/MIT
