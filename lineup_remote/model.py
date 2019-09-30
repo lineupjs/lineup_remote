@@ -32,9 +32,7 @@ class MappingFunction:
         self.range = dump["range"]
 
     def to_query(self, column: str):
-        return "map_value({column}, '{c.type}', {c.domain[0]}, {c.domain[1]}, {c.range[0]}, {c.range[1]})".format(
-            column=column, c=self
-        )
+        return "map_value({column}, '{c.type}', {c.domain[0]}, {c.domain[1]}, {c.range[0]}, {c.range[1]})".format(column=column, c=self)
 
 
 class DateGrouper:
@@ -71,7 +69,7 @@ class StringFilter:
 
 
 class ColumnDump:
-    def __init__(self, dump: Dict[str, Any], column: Optional[str]=None, type: Optional[str]=None):
+    def __init__(self, dump: Dict[str, Any], column: str = "", type: str = ""):
         self.id = dump["id"]
         self.desc = dump["desc"]
         self.column = column
@@ -115,7 +113,7 @@ class StringColumnDump(ColumnDump):
 
 class CompositeColumnDump(ColumnDump):
     def __init__(self, dump: Dict[str, Any]):
-        super(CompositeColumnDump, self).__init__(dump, None, dump["desc"]["type"])
+        super(CompositeColumnDump, self).__init__(dump, "", dump["desc"]["type"])
         self.children = [parse_column_dump(c) for c in dump.get("children", [])]
 
 
@@ -149,11 +147,11 @@ def parse_column_dump(dump: Dict[str, Any]):
         return StackColumnDump(dump)
     elif column_type == "nested":
         return NestedColumnDump(dump)
-    return ColumnDump(dump, None, desc["type"])
+    return ColumnDump(dump, "", desc["type"])
 
 
 class ComputeColumnDump:
-    def __init__(self, dump: Dict[str, Any], type: str):
+    def __init__(self, dump: ColumnDump, type: str):
         self.dump = dump
         self.type = type
 
@@ -190,7 +188,7 @@ class ServerRankingDump:
             args.update(f[1])
         return " AND ".join(f[0] for f in fs), args
 
-    def to_where(self, group: Optional[str]=None):
+    def to_where(self, group: Optional[str] = None):
         filter_sql, args = self.to_filter()
         where = "WHERE " + filter_sql if filter_sql else ""
         if group:
@@ -216,9 +214,7 @@ class ServerRankingDump:
     def to_group_name(self):
         if not self.group_criteria:
             return "'Default group'"
-        return "CONCAT({0})".format(
-            ", ".join("COALESCE({0}, 'Missing values')".format(g.column) for g in self.group_criteria)
-        )
+        return "CONCAT({0})".format(", ".join("COALESCE({0}, 'Missing values')".format(g.column) for g in self.group_criteria))
 
 
 def parse_ranking_dump(dump: Dict[str, Any]):

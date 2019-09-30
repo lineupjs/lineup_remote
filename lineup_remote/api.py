@@ -1,10 +1,13 @@
 import logging
 from connexion import FlaskApp, NoContent
+import datetime
 from sqlalchemy.orm import scoped_session
-from typing import Any, Dict, List
-from .model import parse_column_dump, parse_ranking_dump, parse_compute_column_dump
+from typing import Any, cast, Dict, List, Tuple
+from .model import parse_column_dump, parse_ranking_dump, ComputeColumnDump, parse_compute_column_dump, CategoricalColumnDump, DateColumnDump, NumberColumnDump, ColumnDump
 
 db_session: scoped_session = None
+
+StrDict = Dict[str, Any]
 
 
 def _init_db(uri: str) -> scoped_session:
@@ -18,7 +21,7 @@ def _init_db(uri: str) -> scoped_session:
 TABLE = "rows"
 
 
-def to_dict(result) -> List[Dict[str, Any]]:
+def to_dict(result) -> List[StrDict]:
     columns = result.keys()
     return [{c: r[c] for c in columns} for r in result]
 
@@ -27,7 +30,7 @@ def categories_of(column: str):
     return ["c1", "c2", "c3"] if column == "cat" else ["a1", "a2"]  # TODO generalize
 
 
-def get_desc() -> List[Dict[str, Any]]:
+def get_desc() -> List[StrDict]:
     # TODO derive from DB
     return [
         dict(label="D", type="string", column="d"),
@@ -42,7 +45,7 @@ def get_count() -> int:
     return db_session.scalar("select count(*) as c from {t}".format(t=TABLE))
 
 
-def get_rows(ids: List[str] = None) -> List[Dict[str, Any]]:
+def get_rows(ids: List[str] = None) -> List[StrDict]:
     if not ids:
         return to_dict(db_session.execute("select * from {t}".format(t=TABLE)))
     lookup = {
@@ -67,7 +70,7 @@ def get_row(row_id: str):
     return r[0]
 
 
-def post_sort(body: Dict[str, Any]):
+def post_sort(body: StrDict):
     ranking_dump = parse_ranking_dump(body)
 
     where, args = ranking_dump.to_where()
@@ -93,7 +96,7 @@ def post_sort(body: Dict[str, Any]):
     return {"groups": groups, "maxDataIndex": max((max(g["order"]) for g in groups))}
 
 
-def to_categorical_stats(c, hist: List[Dict[str,Any]]):
+def to_categorical_stats(c: CategoricalColumnDump, hist: List[Dict[str,Any]]):
     categories = categories_of(c.column)
 
     missing = hist[-1]
@@ -103,10 +106,9 @@ def to_categorical_stats(c, hist: List[Dict[str,Any]]):
     return dict(missing=missing, count=count, maxBin=max((bin["count"] for bin in hist), default=0), hist=hist)
 
 
-def to_date_buckets(min_date, max_date):
+def to_date_buckets(min_date: datetime.date, max_date: datetime.date):
     delta = max_date - min_date
 
-    import datetime
     from dateutil.relativedelta import relativedelta
 
     if delta.days > 365:
@@ -123,7 +125,7 @@ def to_date_buckets(min_date, max_date):
         dd = relativedelta(days=1)
         x0 = datetime.date(min_date.year, min_date.month, min_date.day)
 
-    buckets = []
+    buckets: List[datetime.date] = []
     while x0 < max_date:
         buckets.append(x0)
         x0 = x0 + dd
@@ -131,7 +133,7 @@ def to_date_buckets(min_date, max_date):
     return gran, buckets
 
 
-def to_date_stats(c, stats: Dict[str, Any], granularity, buckets: List[int]):
+def to_date_stats(c: DateColumnDump, stats: StrDict, granularity: str, buckets: List[int]):
     return {
         "min": stats["min"],
         "max": stats["max"],
@@ -143,7 +145,7 @@ def to_date_stats(c, stats: Dict[str, Any], granularity, buckets: List[int]):
     }
 
 
-def number_of_bins(length: int):
+def number_of_bins(length: int) -> int:
     if length == 0:
         return 1
     # as by default used in d3 the Sturges' formula
@@ -152,8 +154,8 @@ def number_of_bins(length: int):
     return math.ceil(math.log2(length)) + 1
 
 
-def to_number_stats(c, stats, normalized_stats):
-    def to_hist(hist, domain):
+def to_number_stats(c: NumberColumnDump, stats: StrDict, normalized_stats: StrDict):
+    def to_hist(hist: List[int], domain: Tuple[float, float]):
         bins = len(hist)
         x0 = domain[0]
         delta = (domain[1] - domain[0]) / bins
@@ -167,8 +169,8 @@ def to_number_stats(c, stats, normalized_stats):
         histogram.append(dict(count=hist[-1], x0=x0, x1=domain[1]))
         return histogram
 
-    def to_stat(stats, domain):
-        s = {
+    def to_stat(stats: StrDict, domain: Tuple[float, float]):
+        s: StrDict = {
             "min": stats["min"],
             "max": stats["max"],
             "mean": stats["mean"],
@@ -179,12 +181,12 @@ def to_number_stats(c, stats, normalized_stats):
         }
         return s
 
-    return {"raw": to_stat(stats, c.map.domain), "normalized": to_stat(normalized_stats, [0, 1])}
+    return {"raw": to_stat(stats, c.map.domain), "normalized": to_stat(normalized_stats, (0, 1))}
 
 
-def to_boxplot_stats(c, stats, normalized_stats):
-    def to_stat(stats):
-        boxplot = {
+def to_boxplot_stats(c: NumberColumnDump, stats: StrDict, normalized_stats: StrDict):
+    def to_stat(stats: StrDict):
+        boxplot: StrDict = {
             "min": stats["min"],
             "q1": stats["q1"],
             "median": stats["median"],
@@ -202,13 +204,13 @@ def to_boxplot_stats(c, stats, normalized_stats):
     return {"raw": to_stat(stats), "normalized": to_stat(normalized_stats)}
 
 
-def to_stats(cols, where: str = "", params={}):
-    dates = [c.dump for c in cols if c.type == "date"]
+def to_stats(cols: List[ComputeColumnDump], where: str = "", params: StrDict={}):
+    dates = [cast(DateColumnDump, c.dump) for c in cols if c.type == "date"]
 
-    keys = ["count(*) as c"]
-    for i, col in enumerate(dates):
-        keys.append("min({0}) as mind{1}".format(col.column, i))
-        keys.append("max({0}) as maxd{1}".format(col.column, i))
+    keys: List[str] = ["count(*) as c"]
+    for i, dcol in enumerate(dates):
+        keys.append("min({0}) as mind{1}".format(dcol.column, i))
+        keys.append("max({0}) as maxd{1}".format(dcol.column, i))
     overall = db_session.execute("select {0} from {1}".format(", ".join(keys), TABLE)).first()
 
     bins = number_of_bins(overall["c"])
@@ -217,7 +219,7 @@ def to_stats(cols, where: str = "", params={}):
     ]
     print(date_buckets)
 
-    def cats_of(c):
+    def cats_of(c: ColumnDump):
         categories = categories_of(c.column)
         return ", ".join("'{0}'".format(c) for c in categories)
 
@@ -227,13 +229,15 @@ def to_stats(cols, where: str = "", params={}):
     for i, col in enumerate(cols):
         c = col.dump
         if col.type == "number":
+            nc = cast(NumberColumnDump, c)
             keys.append(
-                "stats({c}, {bins}, {d[0]}, {d[1]}) as stats{i}".format(c=c.column, bins=bins, d=c.map.domain, i=i)
+                "stats({c}, {bins}, {d[0]}, {d[1]}) as stats{i}".format(c=c.column, bins=bins, d=nc.map.domain, i=i)
             )
-            keys.append("stats({n}, {bins}, 0, 1) as nstats{i}".format(n=c.mapped_column, bins=bins, i=i))
+            keys.append("stats({n}, {bins}, 0, 1) as nstats{i}".format(n=nc.mapped_column, bins=bins, i=i))
         elif col.type == "boxplot":
+            nc = cast(NumberColumnDump, c)
             keys.append("boxplot({c}) as boxplot{i}".format(c=c.column, i=i))
-            keys.append("boxplot({n}) as nboxplot{i}".format(n=c.mapped_column, i=i))
+            keys.append("boxplot({n}) as nboxplot{i}".format(n=nc.mapped_column, i=i))
         elif col.type == "categorical":
             keys.append("cathist({c}, ARRAY[{cats}]) as cathist{i}".format(c=c.column, cats=cats_of(c), i=i))
         elif col.type == "date":
@@ -247,29 +251,29 @@ def to_stats(cols, where: str = "", params={}):
 
     r = db_session.execute("select {0} from {2} {1}".format(", ".join(keys), where, TABLE), params=params).first()
 
-    stats = []
+    stats: List[StrDict] = []
     for i, col in enumerate(cols):
         c = col.dump
-        if col.type == "number":
+        if dcol.type == "number":
             sstats = r["stats{i}".format(i=i)]
             nstats = r["nstats{i}".format(i=i)]
-            stats.append(to_number_stats(c, sstats, nstats))
-        elif col.type == "boxplot":
+            stats.append(to_number_stats(cast(NumberColumnDump, c), sstats, nstats))
+        elif dcol.type == "boxplot":
             boxplot = r["boxplot{i}".format(i=i)]
             nboxplot = r["nboxplot{i}".format(i=i)]
-            stats.append(to_boxplot_stats(c, boxplot, nboxplot))
-        elif col.type == "categorical":
+            stats.append(to_boxplot_stats(cast(NumberColumnDump, c), boxplot, nboxplot))
+        elif dcol.type == "categorical":
             cathist = r["cathist{i}".format(i=i)]
-            stats.append(to_categorical_stats(c, cathist))
-        elif col.type == "date":
+            stats.append(to_categorical_stats(cast(CategoricalColumnDump, c), cathist))
+        elif dcol.type == "date":
             dstats = r["dstats{i}".format(i=i)]
             gran, buckets = date_buckets.pop(0)
-            stats.append(to_date_stats(c, dstats, gran, buckets))
+            stats.append(to_date_stats(cast(DateColumnDump, c), dstats, gran, buckets))
 
     return stats
 
 
-def post_stats(body: Dict[str, Any]):
+def post_stats(body: List[StrDict]):
     cols = [parse_compute_column_dump(dump) for dump in body]
     return to_stats(cols)
 
@@ -289,12 +293,12 @@ def get_column_search(column: str, query: str):
     return [row["id"] for row in r]
 
 
-def post_column_stats(column: str, body: Dict[str, Any]):
+def post_column_stats(column: str, body: StrDict):
     column_dump = parse_compute_column_dump(body)
     return to_stats([column_dump])[0]
 
 
-def post_ranking_column_stats(column: str, body: Dict[str, Any]):
+def post_ranking_column_stats(column: str, body: StrDict):
     ranking_dump = parse_ranking_dump(body["ranking"])
     column_dump = parse_compute_column_dump(body["column"])
 
@@ -302,7 +306,7 @@ def post_ranking_column_stats(column: str, body: Dict[str, Any]):
     return to_stats([column_dump], where, args)[0]
 
 
-def post_ranking_stats(body: Dict[str, Any]):
+def post_ranking_stats(body: StrDict):
     ranking_dump = parse_ranking_dump(body["ranking"])
     column_dumps = [parse_compute_column_dump(r) for r in body["columns"]]
 
@@ -310,14 +314,14 @@ def post_ranking_stats(body: Dict[str, Any]):
     return to_stats(column_dumps, where, args)
 
 
-def post_ranking_group_stats(group: str, body: Dict[str, Any]):
+def post_ranking_group_stats(group: str, body: StrDict):
     ranking_dump = parse_ranking_dump(body["ranking"])
     column_dumps = [parse_compute_column_dump(r) for r in body["columns"]]
     where, args = ranking_dump.to_where(group)
     return to_stats(column_dumps, where, args)
 
 
-def post_ranking_group_column_stats(group: str, column: str, body: Dict[str, Any]):
+def post_ranking_group_column_stats(group: str, column: str, body: StrDict):
     ranking_dump = parse_ranking_dump(body["ranking"])
     column_dump = parse_compute_column_dump(body["column"])
     where, args = ranking_dump.to_where(group)
