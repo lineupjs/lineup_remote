@@ -10,7 +10,7 @@ services:
     links:
       - postgres
   postgres:
-    image: postgres:10-alpine
+    image: postgres:13-alpine
     environment:
       - 'POSTGRES_PASSWORD=lineup'
       - 'POSTGRES_USER=lineup'

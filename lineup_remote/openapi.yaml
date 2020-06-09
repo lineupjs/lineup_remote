@@ -9,6 +9,7 @@ paths:
   /row/:
     get:
       summary: get a bunch of rows
+      x-openapi-router-controller: lineup_remote
       operationId: api.get_rows
       parameters:
         - name: ids
@@ -32,6 +33,7 @@ paths:
           description: Row does not exist
     post:
       summary: get a bunch of rows
+      x-openapi-router-controller: lineup_remote
       operationId: api.post_rows
       requestBody:
         required: true
@@ -56,6 +58,7 @@ paths:
   /count:
     get:
       summary: get number of rows
+      x-openapi-router-controller: lineup_remote
       operationId: api.get_count
       responses:
         '200':
@@ -70,6 +73,7 @@ paths:
   /desc:
     get:
       summary: get row desc
+      x-openapi-router-controller: lineup_remote
       operationId: api.get_desc
       responses:
         '200':
@@ -86,6 +90,7 @@ paths:
   /row/{row_id}:
     get:
       summary: get a row by id
+      x-openapi-router-controller: lineup_remote
       operationId: api.get_row
       parameters:
         - $ref: '#/components/parameters/row_id'
@@ -101,6 +106,7 @@ paths:
   /stats:
     post:
       summary: get column data stats
+      x-openapi-router-controller: lineup_remote
       operationId: api.post_stats
       requestBody:
         required: true
@@ -122,6 +128,7 @@ paths:
   /column/{column}/stats:
     get:
       summary: get column data stats
+      x-openapi-router-controller: lineup_remote
       operationId: api.get_column_stats
       parameters:
         - $ref: '#/components/parameters/column'
@@ -136,6 +143,7 @@ paths:
           description: Column not found
     post:
       summary: get column data stats
+      x-openapi-router-controller: lineup_remote
       operationId: api.post_column_stats
       parameters:
         - $ref: '#/components/parameters/column'
@@ -157,6 +165,7 @@ paths:
   /column/{column}/mappingSample:
     get:
       summary: get column data mapping sample
+      x-openapi-router-controller: lineup_remote
       operationId: api.get_column_mapping_sample
       parameters:
         - $ref: '#/components/parameters/column'
@@ -175,6 +184,7 @@ paths:
   /column/{column}/search:
     get:
       summary: search within column
+      x-openapi-router-controller: lineup_remote
       operationId: api.get_column_search
       parameters:
         - $ref: '#/components/parameters/column'
@@ -194,6 +204,7 @@ paths:
   /ranking/sort:
     post:
       summary: sort rows
+      x-openapi-router-controller: lineup_remote
       operationId: api.post_sort
       requestBody:
         required: true
@@ -211,6 +222,7 @@ paths:
   /ranking/column/{column}/stats:
     post:
       summary: get column data stats for a ranking
+      x-openapi-router-controller: lineup_remote
       operationId: api.post_ranking_column_stats
       parameters:
         - $ref: '#/components/parameters/column'
@@ -232,6 +244,7 @@ paths:
   /ranking/stats:
     post:
       summary: get column data stats for a ranking
+      x-openapi-router-controller: lineup_remote
       operationId: api.post_ranking_stats
       requestBody:
         required: true
@@ -251,6 +264,7 @@ paths:
   /ranking/group/{group}/column/{column}/stats:
     post:
       summary: get column data stats for a ranking group
+      x-openapi-router-controller: lineup_remote
       operationId: api.post_ranking_group_column_stats
       parameters:
         - $ref: '#/components/parameters/group'
@@ -273,6 +287,7 @@ paths:
   /ranking/group/{group}/stats:
     post:
       summary: get column data stats for a ranking
+      x-openapi-router-controller: lineup_remote
       operationId: api.post_ranking_group_stats
       parameters:
         - $ref: '#/components/parameters/group'
