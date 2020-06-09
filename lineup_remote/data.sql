@@ -1,5 +1,6 @@
 
-DROP TABLE rows;
+DROP TABLE IF EXISTS rows;
+DROP SEQUENCE IF EXISTS rows_id_seq;
 
 CREATE SEQUENCE rows_id_seq;
 
