@@ -9,6 +9,10 @@ interface IRow {
   cat2: string;
 }
 
+function toColumn(desc: IColumnDump) {
+  return desc.desc.split('@')[1];
+}
+
 class Server implements IServerData {
   constructor(public readonly totalNumberOfRows: number) {
 
@@ -40,13 +44,11 @@ class Server implements IServerData {
   }
 
   mappingSample(column: IColumnDump): Promise<number[]> {
-    return this.post(`/api/column/${column.id}/mappingSample`, column);
+    return this.post(`/api/column/${toColumn(column)}/mappingSample`, column);
   }
 
   search(search: string | RegExp, column: IColumnDump): Promise<number[]> {
-    const url = new URL(`/api/column/${column.id}`);
-    url.searchParams.set('query', search.toString());
-    return fetch(`/api/column/${column.id}/?query=${encodeURIComponent(search.toString())}`).then((r) => r.json());
+    return fetch(`/api/column/${toColumn(column)}/search?query=${encodeURIComponent(search.toString())}`).then((r) => r.json());
   }
 
   computeDataStats(columns: IComputeColumn[]): Promise<IRemoteStatistics[]> {

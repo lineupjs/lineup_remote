@@ -289,7 +289,7 @@ def get_column_mapping_sample(column: str):
 
 
 def get_column_search(column: str, query: str):
-    r = db_session.execute("select id from {t} where {c} = :query".format(c=column, t=TABLE), params=dict(query=query))
+    r = db_session.execute("select id from {t} where {c} like :query".format(c=column, t=TABLE), params=dict(query=f'%{query}%'))
     return [row["id"] for row in r]
 
 
