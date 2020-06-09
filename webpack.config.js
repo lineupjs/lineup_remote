@@ -55,7 +55,7 @@ module.exports = (_env, options) => {
         __VERSION__: JSON.stringify(pkg.version),
         __LICENSE__: JSON.stringify(pkg.license),
         __BUILD_ID__: JSON.stringify(buildId),
-        __LINEUP_VERSION__: JSON.stringify(pkgLock.dependencies.lineupjs.version)
+        __LINEUP_VERSION__: JSON.stringify(pkgLock.dependencies.lineupjs ? pkgLock.dependencies.lineupjs.version : 'unknown')
       }),
       new MiniCssExtractPlugin({
         // Options similar to the same options in webpackOptions.output
