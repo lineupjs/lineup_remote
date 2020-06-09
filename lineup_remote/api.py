@@ -254,18 +254,18 @@ def to_stats(cols: List[ComputeColumnDump], where: str = "", params: StrDict={})
     stats: List[StrDict] = []
     for i, col in enumerate(cols):
         c = col.dump
-        if dcol.type == "number":
+        if col.type == "number":
             sstats = r["stats{i}".format(i=i)]
             nstats = r["nstats{i}".format(i=i)]
             stats.append(to_number_stats(cast(NumberColumnDump, c), sstats, nstats))
-        elif dcol.type == "boxplot":
+        elif col.type == "boxplot":
             boxplot = r["boxplot{i}".format(i=i)]
             nboxplot = r["nboxplot{i}".format(i=i)]
             stats.append(to_boxplot_stats(cast(NumberColumnDump, c), boxplot, nboxplot))
-        elif dcol.type == "categorical":
+        elif col.type == "categorical":
             cathist = r["cathist{i}".format(i=i)]
             stats.append(to_categorical_stats(cast(CategoricalColumnDump, c), cathist))
-        elif dcol.type == "date":
+        elif col.type == "date":
             dstats = r["dstats{i}".format(i=i)]
             gran, buckets = date_buckets.pop(0)
             stats.append(to_date_stats(cast(DateColumnDump, c), dstats, gran, buckets))
